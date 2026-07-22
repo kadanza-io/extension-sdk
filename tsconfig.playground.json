@@ -1,0 +1,10 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "types": ["vite/client"],
+    "paths": {
+      "@kadanza/extension-sdk": ["./src/index.ts"]
+    }
+  },
+  "include": ["playground", "src"]
+}

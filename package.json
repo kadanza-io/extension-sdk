@@ -1,0 +1,43 @@
+{
+  "name": "@kadanza/extension-sdk",
+  "version": "0.0.0",
+  "description": "Helpers for building extensions",
+  "license": "MIT",
+  "type": "module",
+  "files": [
+    "dist"
+  ],
+  "sideEffects": false,
+  "main": "./dist/extension-sdk.cjs",
+  "module": "./dist/extension-sdk.js",
+  "types": "./dist/extension-sdk.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/extension-sdk.d.ts",
+        "default": "./dist/extension-sdk.js"
+      },
+      "require": {
+        "types": "./dist/extension-sdk.d.cts",
+        "default": "./dist/extension-sdk.cjs"
+      }
+    }
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -p tsconfig.lib.json --noEmit && vite build",
+    "preview": "vite preview",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "kadanza",
+    "sdk",
+    "extension",
+    "browser"
+  ],
+  "devDependencies": {
+    "typescript": "~6.0.2",
+    "vite": "^8.1.1",
+    "vite-plugin-dts": "^4.5.4"
+  }
+}
