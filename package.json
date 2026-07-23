@@ -1,6 +1,6 @@
 {
   "name": "@kadanza/extension-sdk",
-  "version": "0.0.0",
+  "version": "0.0.3",
   "description": "Helpers for building extensions",
   "keywords": [
     "kadanza",
@@ -22,17 +22,17 @@
   "exports": {
     ".": {
       "import": {
-        "types": "./dist/extension-sdk.d.ts",
+        "types": "./dist/index.d.ts",
         "default": "./dist/extension-sdk.js"
       },
       "require": {
-        "types": "./dist/extension-sdk.d.cts",
+        "types": "./dist/index.d.cts",
         "default": "./dist/extension-sdk.cjs"
       }
     }
   },
   "main": "./dist/extension-sdk.cjs",
-  "types": "./dist/extension-sdk.d.ts",
+  "types": "./dist/index.d.ts",
   "files": [
     "dist"
   ],
@@ -40,7 +40,8 @@
     "dev": "vite",
     "build": "tsc -p tsconfig.lib.json --noEmit && vite build",
     "preview": "vite preview",
-    "prepublishOnly": "npm run build"
+    "check:types": "npx --yes @arethetypeswrong/cli --pack .",
+    "prepublishOnly": "npm run build && npm run check:types"
   },
   "devDependencies": {
     "typescript": "~6.0.2",

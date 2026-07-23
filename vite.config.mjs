@@ -1,32 +1,10 @@
-import { copyFileSync, existsSync, rmSync } from "node:fs";
+import { copyFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { defineConfig } from "vite";
 import dts from "vite-plugin-dts";
 
 const rootDir = import.meta.dirname;
 const distDir = resolve(rootDir, "dist");
-
-function publishDeclarationFiles() {
-  const candidates = [
-    resolve(distDir, "src/index.d.ts"),
-    resolve(distDir, "index.d.ts"),
-    resolve(distDir, "extension-sdk.d.ts"),
-  ];
-  const source = candidates.find((path) => existsSync(path));
-  if (!source) {
-    return;
-  }
-
-  const namedDts = resolve(distDir, "extension-sdk.d.ts");
-  const namedCts = resolve(distDir, "extension-sdk.d.cts");
-  copyFileSync(source, namedDts);
-  copyFileSync(source, namedCts);
-
-  const nestedSrc = resolve(distDir, "src");
-  if (existsSync(nestedSrc)) {
-    rmSync(nestedSrc, { recursive: true, force: true });
-  }
-}
 
 export default defineConfig(({ command }) => {
   const shared = {
@@ -50,10 +28,14 @@ export default defineConfig(({ command }) => {
     plugins: [
       dts({
         tsconfigPath: "./tsconfig.lib.json",
-        include: ["src/index.ts"],
-        entryRoot: "src",
-        insertTypesEntry: false,
-        afterBuild: publishDeclarationFiles,
+        include: ["src"],
+        rollupTypes: true,
+        afterBuild: () => {
+          copyFileSync(
+            resolve(distDir, "index.d.ts"),
+            resolve(distDir, "index.d.cts"),
+          );
+        },
       }),
     ],
     build: {
