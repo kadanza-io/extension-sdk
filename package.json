@@ -42,12 +42,6 @@
     "preview": "vite preview",
     "prepublishOnly": "npm run build"
   },
-  "keywords": [
-    "kadanza",
-    "sdk",
-    "extension",
-    "browser"
-  ],
   "devDependencies": {
     "typescript": "~6.0.2",
     "vite": "^8.1.1",

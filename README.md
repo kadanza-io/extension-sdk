@@ -13,18 +13,18 @@ npm install @kadanza/extension-sdk
 ### ESM
 
 ```ts
-import { createKadanzaSDK, type SDK } from "@kadanza/extension-sdk";
+import { createExtensionSDK, type ExtensionSDK } from "@kadanza/extension-sdk";
 
-const sdk: SDK = createKadanzaSDK();
+const sdk: ExtensionSDK = createExtensionSDK();
 console.log(sdk.wip);
 ```
 
 ### CommonJS
 
 ```js
-const { createKadanzaSDK } = require("@kadanza/extension-sdk");
+const { createExtensionSDK } = require("@kadanza/extension-sdk");
 
-const sdk = createKadanzaSDK();
+const sdk = createExtensionSDK();
 console.log(sdk.wip);
 ```
 
