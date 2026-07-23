@@ -13,9 +13,9 @@ npm install @kadanza/extension-sdk
 ### ESM
 
 ```ts
-import { createExtensionSDK, type ExtensionSDK } from "@kadanza/extension-sdk";
+import { createExtensionSDK, type IExtensionSDK } from "@kadanza/extension-sdk";
 
-const sdk: ExtensionSDK = createExtensionSDK();
+const sdk: IExtensionSDK = createExtensionSDK();
 console.log(sdk.wip);
 ```
 

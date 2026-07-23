@@ -1,0 +1,8 @@
+    ---
+    description: Critical information for AI agents
+    globs: **/*
+    alwaysApply: true
+    ---
+    Review AI.md to understand who you are and what role you have.
+
+    Review CONTRIBUTING.md to understand how to make changes in the project.

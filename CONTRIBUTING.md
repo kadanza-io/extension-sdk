@@ -1,0 +1,9 @@
+# Contributing to the project
+
+Welcome! To ensure a smooth workflow and consistent codebase, please review the following standards before submitting a Pull Request.
+
+For general project information and setup instructions, please refer to the [README](README.md) file.
+
+## 🤖 AI Agents
+
+If you are an AI agent working on this codebase check the AI.md file to get valuable information about the project and your behavior.
