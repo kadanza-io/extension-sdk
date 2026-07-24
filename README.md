@@ -42,10 +42,15 @@ sdk.connect().then(({ authToken }) => {
 });
 ```
 
+## API reference
+
+Published docs: [GitHub Pages](https://kadanza-io.github.io/extension-sdk/)
+
 ## Local development
 
 ```bash
 npm install
 npm run dev      # Serve a playground/ setup. Use its URL for embedding in the main app
 npm run build    # emit dist/ (ESM + CJS + types)
+npm run docs     # generate HTML API docs under docs/api/
 ```

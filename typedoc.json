@@ -1,0 +1,11 @@
+{
+  "$schema": "https://typedoc.org/schema.json",
+  "entryPoints": ["src/index.ts"],
+  "tsconfig": "./tsconfig.lib.json",
+  "out": "docs/api",
+  "readme": "none",
+  "hostedBaseUrl": "https://kadanza-io.github.io/extension-sdk/",
+  "excludePrivate": true,
+  "excludeInternal": true,
+  "excludeExternals": true
+}

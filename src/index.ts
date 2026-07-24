@@ -20,6 +20,7 @@ export type {
   TokenRefreshPayload,
 } from "./types";
 
+/** Creates a new {@link IExtensionSDK} instance for the current extension frame. */
 export const createExtensionSDK = (): IExtensionSDK => {
   return new ExtensionSDK();
 };

@@ -16,23 +16,85 @@ import type {
 
 const DEFAULT_TIMEOUT_MS = 10_000;
 
+/**
+ * Public contract for talking to the Kadanza parent frame over `postMessage`.
+ *
+ * Requires a `tenantUrl` search param on the extension URL so
+ * {@link connect} can validate the parent origin.
+ */
 export interface IExtensionSDK {
+  /**
+   * Establishes the parent connection and waits for `HANDSHAKE_ACK`.
+   *
+   * If already connected with cached handshake data, returns that payload
+   * without sending another init. Concurrent calls while a handshake is
+   * in progress throw.
+   *
+   * @param options - Optional handshake timeout (default 10s).
+   * @throws {InvalidOriginError} When `tenantUrl` is missing or invalid.
+   * @throws When not embedded in a parent frame, already handshaking,
+   *   destroyed, or the handshake times out / returns an invalid payload.
+   */
   connect(options?: ConnectOptions): Promise<HandshakePayload>;
+
+  /**
+   * Tears down listeners and cached state. Rejects any in-flight requests.
+   * The instance cannot be reused after destroy.
+   */
   destroy(): void;
 
+  /** Whether a successful handshake has completed and not been destroyed. */
   readonly isConnected: boolean;
+
+  /** Last auth token from handshake or refresh; `null` until connected. */
   getAuthToken(): ScopedExtensionToken | null;
+
+  /** Extension context from handshake; `null` until connected. */
   getExtensionDetails(): ExtensionDetails | null;
+
+  /** Design tokens from handshake; `null` until connected. */
   getDesignTokens(): DesignTokens | null;
+
+  /**
+   * Latest page settings from handshake or `LOAD_PAGE_SETTINGS`;
+   * `null` until set.
+   */
   getPageSettings(): PageSettings | null;
 
+  /**
+   * Asks the parent for a new token and waits for `TOKEN_REFRESH`.
+   *
+   * @param options - Optional request timeout (default 10s).
+   * @throws When not connected, a refresh is already in progress,
+   *   or the request times out / returns an invalid payload.
+   */
   requestTokenRefresh(options?: RequestOptions): Promise<ScopedExtensionToken>;
+
+  /**
+   * Pushes page settings to the parent and waits for `PAGE_SETTINGS_UPDATED`.
+   *
+   * @param settings - Settings object to send.
+   * @param options - Optional request timeout (default 10s).
+   * @throws When not connected, an update is already in progress,
+   *   or the request times out / returns an invalid payload.
+   */
   updatePageSettings(
     settings: PageSettings,
     options?: RequestOptions,
   ): Promise<PageSettingsUpdatedPayload>;
 
+  /**
+   * Registers a handler for parent-initiated `LOAD_PAGE_SETTINGS`.
+   *
+   * @returns Unsubscribe function.
+   */
   onLoadPageSettings(handler: (settings: PageSettings) => void): () => void;
+
+  /**
+   * Registers a handler for token updates (requested or parent-pushed).
+   *
+   * @returns Unsubscribe function.
+   */
   onTokenRefresh(handler: (token: ScopedExtensionToken) => void): () => void;
 }
 
@@ -42,6 +104,7 @@ type Pending<T> = {
   timer: ReturnType<typeof setTimeout>;
 };
 
+/** Default {@link IExtensionSDK} implementation. Prefer {@link createExtensionSDK}. */
 export class ExtensionSDK implements IExtensionSDK {
   #allowedOrigin: string | null = null;
   #unsubscribe: (() => void) | null = null;
