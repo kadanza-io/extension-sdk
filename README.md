@@ -1,6 +1,6 @@
 # @kadanza/extension-sdk
 
-Helpers for building extensions
+Helpers for building Kadanza extensions embedded in the parent app via iframe `postMessage`.
 
 ## Install
 
@@ -16,7 +16,18 @@ npm install @kadanza/extension-sdk
 import { createExtensionSDK, type IExtensionSDK } from "@kadanza/extension-sdk";
 
 const sdk: IExtensionSDK = createExtensionSDK();
-console.log(sdk.wip);
+
+const { authToken, extensionDetails, designTokens } = await sdk.connect();
+
+sdk.onLoadPageSettings((settings) => {
+  // open settings UI with values from parent
+  console.log(settings);
+});
+
+const refreshed = await sdk.requestTokenRefresh();
+console.log(refreshed.jwt);
+
+await sdk.updatePageSettings({ setting1: 123 });
 ```
 
 ### CommonJS
@@ -25,8 +36,13 @@ console.log(sdk.wip);
 const { createExtensionSDK } = require("@kadanza/extension-sdk");
 
 const sdk = createExtensionSDK();
-console.log(sdk.wip);
+
+sdk.connect().then(({ authToken }) => {
+  console.log(authToken.jwt);
+});
 ```
+
+The parent must pass `tenantUrl` as a search param on the iframe `src`. See [docs/communication-process.md](docs/communication-process.md).
 
 ## Local development
 

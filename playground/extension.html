@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Extension — extension-sdk playground</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body class="extension-body">
+    <section class="panel" style="min-height: calc(100vh - 2rem)">
+      <h1>Extension (SDK child)</h1>
+      <p>Uses <code>createExtensionSDK()</code> inside the iframe.</p>
+
+      <div class="controls">
+        <button id="refresh-token" type="button" disabled>
+          Request token refresh
+        </button>
+        <button id="update-settings" type="button" disabled>
+          Update page settings
+        </button>
+      </div>
+
+      <h2>Connection</h2>
+      <pre id="extension-state" class="status">Connecting…</pre>
+
+      <h2>Events</h2>
+      <pre id="extension-log" class="log"></pre>
+    </section>
+
+    <script type="module" src="/extension.ts"></script>
+  </body>
+</html>

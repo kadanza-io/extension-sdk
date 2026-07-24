@@ -1,0 +1,145 @@
+:root {
+  color-scheme: light dark;
+  font-family: system-ui, sans-serif;
+  line-height: 1.4;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 1rem;
+  background: #0f1115;
+  color: #e8eaed;
+}
+
+h1,
+h2,
+h3 {
+  margin: 0 0 0.5rem;
+  font-weight: 600;
+}
+
+p {
+  margin: 0 0 0.75rem;
+}
+
+button {
+  cursor: pointer;
+  border: 1px solid #3a3f4b;
+  background: #1c212b;
+  color: inherit;
+  border-radius: 6px;
+  padding: 0.4rem 0.75rem;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+button:not(:disabled):hover {
+  background: #273041;
+}
+
+.layout {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: 1fr 1fr;
+  min-height: calc(100vh - 2rem);
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  border: 1px solid #2a2f3a;
+  border-radius: 10px;
+  padding: 1rem;
+  background: #151922;
+  min-height: 0;
+}
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.status {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.85rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: #0c0e13;
+  border: 1px solid #2a2f3a;
+  border-radius: 8px;
+  padding: 0.75rem;
+  margin: 0;
+}
+
+.log {
+  flex: 1;
+  overflow: auto;
+  margin: 0;
+  padding: 0.75rem;
+  border-radius: 8px;
+  border: 1px solid #2a2f3a;
+  background: #0c0e13;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.8rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.iframe-shell {
+  flex: 1;
+  min-height: 360px;
+  border: 1px solid #2a2f3a;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #fff;
+}
+
+.iframe-shell iframe {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: #fff;
+}
+
+.extension-body {
+  background: #f5f7fb;
+  color: #111827;
+}
+
+.extension-body .panel {
+  background: #fff;
+  border-color: #d7dce5;
+  color: #111827;
+}
+
+.extension-body .status,
+.extension-body .log {
+  background: #f8fafc;
+  border-color: #d7dce5;
+  color: #111827;
+}
+
+.extension-body button {
+  background: #eef2ff;
+  border-color: #c7d2fe;
+  color: #1e3a8a;
+}
+
+.extension-body button:not(:disabled):hover {
+  background: #e0e7ff;
+}
+
+@media (max-width: 960px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+}
