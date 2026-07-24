@@ -44,7 +44,7 @@ Wire: `LOAD_PAGE_SETTINGS` → `UPDATE_PAGE_SETTINGS` → `PAGE_SETTINGS_UPDATED
 
 ```ts
 sdk.onLoadPageSettings((settings) => {
-  // open settings UI with values from parent
+  // Parent app request the extension to open settings UI with initial values provided by the it
 });
 
 const { success } = await sdk.updatePageSettings({ setting1: 123 });
