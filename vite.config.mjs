@@ -19,7 +19,6 @@ export default defineConfig(({ command }) => {
     return {
       ...shared,
       root: "playground",
-      publicDir: resolve(rootDir, "public"),
     };
   }
 

@@ -42,12 +42,10 @@ sdk.connect().then(({ authToken }) => {
 });
 ```
 
-The parent must pass `tenantUrl` as a search param on the iframe `src`. See [docs/communication-process.md](docs/communication-process.md).
-
 ## Local development
 
 ```bash
 npm install
-npm run dev      # local playground/ demo
+npm run dev      # Serve a playground/ setup. Use its URL for embedding in the main app
 npm run build    # emit dist/ (ESM + CJS + types)
 ```

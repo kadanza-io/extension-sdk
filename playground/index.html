@@ -2,41 +2,32 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Parent simulator — extension-sdk playground</title>
+    <title>Extension — extension-sdk playground</title>
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
-    <div class="layout">
-      <section class="panel">
-        <h1>Parent simulator</h1>
-        <p>
-          Embeds the extension iframe and responds to
-          <code>postMessage</code> protocol events.
-        </p>
+    <section class="panel">
+      <h1>Extension SDK Playground</h1>
 
-        <div class="controls">
-          <button id="load-settings" type="button" disabled>
-            Send LOAD_PAGE_SETTINGS
-          </button>
-          <button id="reload-iframe" type="button">Reload iframe</button>
-        </div>
+      <div class="controls">
+        <button id="refresh-token" type="button" disabled>
+          Request token refresh
+        </button>
+      </div>
 
-        <h2>State</h2>
-        <pre id="parent-state" class="status">Waiting for iframe…</pre>
+      <div class="columns">
+        <details class="column" open>
+          <summary>Events</summary>
+          <ol id="extension-log" class="log"></ol>
+        </details>
 
-        <h2>Event log</h2>
-        <pre id="parent-log" class="log"></pre>
-      </section>
-
-      <section class="panel">
-        <h2>Extension iframe</h2>
-        <div class="iframe-shell">
-          <iframe id="extension-frame" title="Extension"></iframe>
-        </div>
-      </section>
-    </div>
+        <details class="column" open>
+          <summary>Payload</summary>
+          <pre id="extension-state" class="status">Connecting…</pre>
+        </details>
+      </div>
+    </section>
 
     <script type="module" src="/main.ts"></script>
   </body>
