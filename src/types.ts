@@ -48,6 +48,16 @@ export interface PageSettingsUpdatedPayload {
   success: boolean;
 }
 
+/** Payload for `UPDATE_PAGE_SETTINGS` (child → parent). */
+export interface UpdatePageSettingsPayload {
+  settings: PageSettings;
+}
+
+/** Payload for `NAVIGATION_CHANGE` (child → parent). */
+export interface NavigationChangePayload {
+  path: string;
+}
+
 /** Envelope for parent/child `postMessage` traffic. */
 export interface ExtensionMessage<TPayload = unknown> {
   type: ConnectionEvent | string;

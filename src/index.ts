@@ -13,11 +13,13 @@ export type {
   ExtensionDetails,
   ExtensionMessage,
   HandshakePayload,
+  NavigationChangePayload,
   PageSettings,
   PageSettingsUpdatedPayload,
   RequestOptions,
   ScopedExtensionToken,
   TokenRefreshPayload,
+  UpdatePageSettingsPayload,
 } from "./types";
 
 /** Creates a new {@link IExtensionSDK} instance for the current extension frame. */

@@ -26,7 +26,7 @@ Wire: `REQUEST_TOKEN_REFRESH` → `TOKEN_REFRESH`
 
 ```ts
 // Request a refresh
-const token = await sdk.requestTokenRefresh();
+const token = await sdk.emitRequestTokenRefresh();
 
 // Also listen for any token update (requested or parent-pushed)
 sdk.onTokenRefresh((token) => {
@@ -34,7 +34,7 @@ sdk.onTokenRefresh((token) => {
 });
 ```
 
-See [`requestTokenRefresh`](https://kadanza-io.github.io/extension-sdk/interfaces/IExtensionSDK.html#requesttokenrefresh) and [`onTokenRefresh`](https://kadanza-io.github.io/extension-sdk/interfaces/IExtensionSDK.html#ontokenrefresh).
+See [`emitRequestTokenRefresh`](https://kadanza-io.github.io/extension-sdk/interfaces/IExtensionSDK.html#emitrequesttokenrefresh) and [`onTokenRefresh`](https://kadanza-io.github.io/extension-sdk/interfaces/IExtensionSDK.html#ontokenrefresh).
 
 ## Page settings
 
@@ -47,10 +47,29 @@ sdk.onLoadPageSettings((settings) => {
   // Parent app request the extension to open settings UI with initial values provided by the it
 });
 
-const { success } = await sdk.updatePageSettings({ setting1: 123 });
+const { success } = await sdk.emitUpdatePageSettings({
+  settings: { setting1: 123 },
+});
 ```
 
-See [`onLoadPageSettings`](https://kadanza-io.github.io/extension-sdk/interfaces/IExtensionSDK.html#onloadpagesettings) and [`updatePageSettings`](https://kadanza-io.github.io/extension-sdk/interfaces/IExtensionSDK.html#updatepagesettings).
+See [`onLoadPageSettings`](https://kadanza-io.github.io/extension-sdk/interfaces/IExtensionSDK.html#onloadpagesettings) and [`emitUpdatePageSettings`](https://kadanza-io.github.io/extension-sdk/interfaces/IExtensionSDK.html#emitupdatepagesettings).
+
+## Navigation change
+
+Notifies the parent when the extension's route/path changes. Fire-and-forget; no ACK.
+
+Wire: `NAVIGATION_CHANGE` (child → parent)
+
+`tenantUrl` is read and validated by [`connect()`](https://kadanza-io.github.io/extension-sdk/interfaces/IExtensionSDK.html#connect) — builders only pass the path.
+
+```ts
+await sdk.connect();
+
+// Call whenever your app's path changes
+sdk.emitNavigationChange({ path: "/demo" });
+```
+
+See [`emitNavigationChange`](https://kadanza-io.github.io/extension-sdk/interfaces/IExtensionSDK.html#emitnavigationchange).
 
 ## Teardown
 

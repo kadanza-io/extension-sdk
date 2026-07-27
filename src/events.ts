@@ -19,6 +19,8 @@ export const CONNECTION_EVENTS = {
   updatePageSettings: "UPDATE_PAGE_SETTINGS",
   /** Parent → child: result of a page settings update. */
   pageSettingsUpdated: "PAGE_SETTINGS_UPDATED",
+  /** Child → parent: extension route changed. */
+  navigationChange: "NAVIGATION_CHANGE",
 } as const;
 
 /** Union of all {@link CONNECTION_EVENTS} wire string values. */

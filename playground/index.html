@@ -10,11 +10,29 @@
     <section class="panel">
       <h1>Extension SDK Playground</h1>
 
-      <div class="controls">
-        <button id="refresh-token" type="button" disabled>
-          Request token refresh
-        </button>
-      </div>
+      <details class="actions-panel" open>
+        <summary>Emit to parent</summary>
+        <div class="controls">
+          <section class="action-group">
+            <h2>Token refresh</h2>
+            <button id="refresh-token" type="button" disabled>
+              Request token refresh
+            </button>
+          </section>
+          <section class="action-group">
+            <h2>Navigation change</h2>
+            <div class="action-group-body">
+              <label class="nav-path">
+                Path
+                <input id="nav-path" type="text" value="/demo" disabled />
+              </label>
+              <button id="notify-navigation" type="button" disabled>
+                Notify navigation change
+              </button>
+            </div>
+          </section>
+        </div>
+      </details>
 
       <div class="columns">
         <details class="column" open>

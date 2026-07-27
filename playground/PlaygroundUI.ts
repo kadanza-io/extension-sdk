@@ -3,16 +3,19 @@
 import type {
   HandshakePayload,
   IExtensionSDK,
+  NavigationChangePayload,
   PageSettings,
   PageSettingsUpdatedPayload,
   ScopedExtensionToken,
+  UpdatePageSettingsPayload,
 } from "@kadanza/extension-sdk";
 
 export interface PlaygroundUIOptions {
-  onRequestTokenRefresh: () => Promise<ScopedExtensionToken>;
-  onUpdatePageSettings: (
-    settings: PageSettings,
+  onEmitRequestTokenRefresh: () => Promise<ScopedExtensionToken>;
+  onEmitUpdatePageSettings: (
+    payload: UpdatePageSettingsPayload,
   ) => Promise<PageSettingsUpdatedPayload>;
+  onEmitNavigationChange: (payload: NavigationChangePayload) => void;
 }
 
 export interface PlaygroundUIState {
@@ -54,6 +57,8 @@ export class PlaygroundUI {
   readonly #stateEl: HTMLPreElement;
   readonly #logEl: HTMLOListElement;
   readonly #refreshBtn: HTMLButtonElement;
+  readonly #navPathInput: HTMLInputElement;
+  readonly #notifyNavBtn: HTMLButtonElement;
   readonly #logEntries: LogEntry[] = [];
 
   constructor(sdk: IExtensionSDK, options: PlaygroundUIOptions) {
@@ -62,9 +67,15 @@ export class PlaygroundUI {
     this.#stateEl = requireEl<HTMLPreElement>("#extension-state");
     this.#logEl = requireEl<HTMLOListElement>("#extension-log");
     this.#refreshBtn = requireEl<HTMLButtonElement>("#refresh-token");
+    this.#navPathInput = requireEl<HTMLInputElement>("#nav-path");
+    this.#notifyNavBtn = requireEl<HTMLButtonElement>("#notify-navigation");
 
     this.#refreshBtn.addEventListener("click", () => {
       void this.#handleTokenRefresh();
+    });
+
+    this.#notifyNavBtn.addEventListener("click", () => {
+      this.#handleNotifyNavigation();
     });
   }
 
@@ -96,12 +107,26 @@ export class PlaygroundUI {
 
   async #handleTokenRefresh(): Promise<void> {
     try {
-      const token = await this.#options.onRequestTokenRefresh();
-      this.#appendLog(`requestTokenRefresh resolved ${JSON.stringify(token)}`);
+      const token = await this.#options.onEmitRequestTokenRefresh();
+      this.#appendLog(
+        `emitRequestTokenRefresh resolved ${JSON.stringify(token)}`,
+      );
       this.#renderFromSdk();
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
-      this.#appendLog(`requestTokenRefresh failed: ${message}`);
+      this.#appendLog(`emitRequestTokenRefresh failed: ${message}`);
+    }
+  }
+
+  #handleNotifyNavigation(): void {
+    const path = this.#navPathInput.value.trim() || "/";
+    try {
+      this.#options.onEmitNavigationChange({ path });
+      this.#appendLog(`emitNavigationChange path=${path}`);
+      this.#renderFromSdk({ lastEvent: "NAVIGATION_CHANGE", lastPath: path });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.#appendLog(`emitNavigationChange failed: ${message}`);
     }
   }
 
@@ -112,7 +137,7 @@ export class PlaygroundUI {
     );
 
     if (raw === null) {
-      this.#appendLog("updatePageSettings cancelled");
+      this.#appendLog("emitUpdatePageSettings cancelled");
       return;
     }
 
@@ -121,22 +146,26 @@ export class PlaygroundUI {
       settings = parseSettingsJson(raw);
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
-      this.#appendLog(`updatePageSettings parse failed: ${message}`);
+      this.#appendLog(`emitUpdatePageSettings parse failed: ${message}`);
       return;
     }
 
     try {
-      const result = await this.#options.onUpdatePageSettings(settings);
-      this.#appendLog(`updatePageSettings resolved ${JSON.stringify(result)}`);
+      const result = await this.#options.onEmitUpdatePageSettings({ settings });
+      this.#appendLog(
+        `emitUpdatePageSettings resolved ${JSON.stringify(result)}`,
+      );
       this.#renderFromSdk({ lastSubmittedSettings: settings });
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
-      this.#appendLog(`updatePageSettings failed: ${message}`);
+      this.#appendLog(`emitUpdatePageSettings failed: ${message}`);
     }
   }
 
   #setActionsEnabled(enabled: boolean): void {
     this.#refreshBtn.disabled = !enabled;
+    this.#navPathInput.disabled = !enabled;
+    this.#notifyNavBtn.disabled = !enabled;
   }
 
   #appendLog(message: string): void {

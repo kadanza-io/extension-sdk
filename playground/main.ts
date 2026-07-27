@@ -5,8 +5,9 @@ import { PlaygroundUI } from "./PlaygroundUI";
 
 const sdk = createExtensionSDK();
 const ui = new PlaygroundUI(sdk, {
-  onRequestTokenRefresh: () => sdk.requestTokenRefresh(),
-  onUpdatePageSettings: (settings) => sdk.updatePageSettings(settings),
+  onEmitRequestTokenRefresh: () => sdk.emitRequestTokenRefresh(),
+  onEmitUpdatePageSettings: (payload) => sdk.emitUpdatePageSettings(payload),
+  onEmitNavigationChange: (payload) => sdk.emitNavigationChange(payload),
 });
 
 sdk.onLoadPageSettings((settings) => {

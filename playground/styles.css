@@ -49,10 +49,65 @@ button:not(:disabled):hover {
   background: #fff;
 }
 
+.actions-panel {
+  min-width: 0;
+}
+
+.actions-panel > summary,
+.column summary {
+  cursor: pointer;
+  font-weight: 600;
+  user-select: none;
+}
+
 .controls {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+  align-items: stretch;
+}
+
+.action-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  border: 1px solid #d7dce5;
+  border-radius: 8px;
+  padding: 0.75rem;
+  background: #fff;
+}
+
+.action-group h2 {
+  margin: 0;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.action-group-body {
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
+  align-items: center;
+}
+
+.nav-path {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.875rem;
+}
+
+.nav-path input {
+  border: 1px solid #c7d2fe;
+  border-radius: 6px;
+  padding: 0.4rem 0.5rem;
+  font: inherit;
+  min-width: 10rem;
+}
+
+.nav-path input:disabled {
+  opacity: 0.5;
 }
 
 .columns {
@@ -73,12 +128,6 @@ button:not(:disabled):hover {
 
 .column[open] {
   min-height: 0;
-}
-
-.column summary {
-  cursor: pointer;
-  font-weight: 600;
-  user-select: none;
 }
 
 .status,

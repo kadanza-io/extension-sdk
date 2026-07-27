@@ -7,11 +7,13 @@ import type {
   ExtensionDetails,
   ExtensionMessage,
   HandshakePayload,
+  NavigationChangePayload,
   PageSettings,
   PageSettingsUpdatedPayload,
   RequestOptions,
   ScopedExtensionToken,
   TokenRefreshPayload,
+  UpdatePageSettingsPayload,
 } from "./types";
 
 const DEFAULT_TIMEOUT_MS = 10_000;
@@ -68,18 +70,20 @@ export interface IExtensionSDK {
    * @throws When not connected, a refresh is already in progress,
    *   or the request times out / returns an invalid payload.
    */
-  requestTokenRefresh(options?: RequestOptions): Promise<ScopedExtensionToken>;
+  emitRequestTokenRefresh(
+    options?: RequestOptions,
+  ): Promise<ScopedExtensionToken>;
 
   /**
    * Pushes page settings to the parent and waits for `PAGE_SETTINGS_UPDATED`.
    *
-   * @param settings - Settings object to send.
+   * @param payload - Update payload containing the settings object.
    * @param options - Optional request timeout (default 10s).
    * @throws When not connected, an update is already in progress,
    *   or the request times out / returns an invalid payload.
    */
-  updatePageSettings(
-    settings: PageSettings,
+  emitUpdatePageSettings(
+    payload: UpdatePageSettingsPayload,
     options?: RequestOptions,
   ): Promise<PageSettingsUpdatedPayload>;
 
@@ -96,6 +100,16 @@ export interface IExtensionSDK {
    * @returns Unsubscribe function.
    */
   onTokenRefresh(handler: (token: ScopedExtensionToken) => void): () => void;
+
+  /**
+   * Notifies the parent that the extension's route changed.
+   *
+   * Wire: `NAVIGATION_CHANGE` (fire-and-forget).
+   *
+   * @param payload - Navigation change payload (`path` within the extension).
+   * @throws When not connected or destroyed.
+   */
+  emitNavigationChange(payload: NavigationChangePayload): void;
 }
 
 type Pending<T> = {
@@ -217,7 +231,7 @@ export class ExtensionSDK implements IExtensionSDK {
     return this.#pageSettings;
   }
 
-  async requestTokenRefresh(
+  async emitRequestTokenRefresh(
     options: RequestOptions = {},
   ): Promise<ScopedExtensionToken> {
     this.#assertConnected();
@@ -242,8 +256,8 @@ export class ExtensionSDK implements IExtensionSDK {
     return promise;
   }
 
-  async updatePageSettings(
-    settings: PageSettings,
+  async emitUpdatePageSettings(
+    payload: UpdatePageSettingsPayload,
     options: RequestOptions = {},
   ): Promise<PageSettingsUpdatedPayload> {
     this.#assertConnected();
@@ -264,7 +278,7 @@ export class ExtensionSDK implements IExtensionSDK {
       this.#pendingPageSettingsUpdate = { resolve, reject, timer };
     });
 
-    postToParent(CONNECTION_EVENTS.updatePageSettings, allowedOrigin, settings);
+    postToParent(CONNECTION_EVENTS.updatePageSettings, allowedOrigin, payload);
     return promise;
   }
 
@@ -280,6 +294,15 @@ export class ExtensionSDK implements IExtensionSDK {
     return () => {
       this.#tokenRefreshHandlers.delete(handler);
     };
+  }
+
+  emitNavigationChange(payload: NavigationChangePayload): void {
+    this.#assertConnected();
+    postToParent(
+      CONNECTION_EVENTS.navigationChange,
+      this.#allowedOrigin!,
+      payload,
+    );
   }
 
   #onMessage(event: MessageEvent<ExtensionMessage>): void {
