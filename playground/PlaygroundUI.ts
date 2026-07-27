@@ -1,17 +1,17 @@
 // Playground demo UI and presentation helpers for the extension SDK.
 
 import type {
+  AuthToken,
   HandshakePayload,
   IExtensionSDK,
   NavigationChangePayload,
   PageSettings,
   PageSettingsUpdatedPayload,
-  ScopedExtensionToken,
   UpdatePageSettingsPayload,
 } from "@kadanza/extension-sdk";
 
 export interface PlaygroundUIOptions {
-  onEmitRequestTokenRefresh: () => Promise<ScopedExtensionToken>;
+  onEmitRequestAuthTokenRefresh: () => Promise<AuthToken>;
   onEmitUpdatePageSettings: (
     payload: UpdatePageSettingsPayload,
   ) => Promise<PageSettingsUpdatedPayload>;
@@ -57,7 +57,7 @@ export class PlaygroundUI {
   readonly #options: PlaygroundUIOptions;
   readonly #stateEl: HTMLPreElement;
   readonly #logEl: HTMLOListElement;
-  readonly #refreshBtn: HTMLButtonElement;
+  readonly #authTokenRefreshBtn: HTMLButtonElement;
   readonly #navPathInput: HTMLInputElement;
   readonly #notifyNavBtn: HTMLButtonElement;
   readonly #apiEndpointInput: HTMLInputElement;
@@ -69,14 +69,14 @@ export class PlaygroundUI {
     this.#options = options;
     this.#stateEl = requireEl<HTMLPreElement>("#extension-state");
     this.#logEl = requireEl<HTMLOListElement>("#extension-log");
-    this.#refreshBtn = requireEl<HTMLButtonElement>("#refresh-token");
+    this.#authTokenRefreshBtn = requireEl<HTMLButtonElement>("#refresh-auth-token");
     this.#navPathInput = requireEl<HTMLInputElement>("#nav-path");
     this.#notifyNavBtn = requireEl<HTMLButtonElement>("#notify-navigation");
     this.#apiEndpointInput = requireEl<HTMLInputElement>("#api-endpoint");
     this.#callApiBtn = requireEl<HTMLButtonElement>("#call-api");
 
-    this.#refreshBtn.addEventListener("click", () => {
-      void this.#handleTokenRefresh();
+    this.#authTokenRefreshBtn.addEventListener("click", () => {
+      void this.#handleAuthTokenRefresh();
     });
 
     this.#notifyNavBtn.addEventListener("click", () => {
@@ -109,21 +109,21 @@ export class PlaygroundUI {
     void this.#promptAndUpdatePageSettings();
   }
 
-  tokenRefreshed(token: ScopedExtensionToken): void {
-    this.#appendLog(`onTokenRefresh ${JSON.stringify(token)}`);
+  authTokenRefreshed(authToken: AuthToken): void {
+    this.#appendLog(`onAuthTokenRefresh ${JSON.stringify(authToken)}`);
     this.#renderFromSdk({ lastEvent: "TOKEN_REFRESH" });
   }
 
-  async #handleTokenRefresh(): Promise<void> {
+  async #handleAuthTokenRefresh(): Promise<void> {
     try {
-      const token = await this.#options.onEmitRequestTokenRefresh();
+      const authToken = await this.#options.onEmitRequestAuthTokenRefresh();
       this.#appendLog(
-        `emitRequestTokenRefresh resolved ${JSON.stringify(token)}`,
+        `emitRequestAuthTokenRefresh resolved ${JSON.stringify(authToken)}`,
       );
       this.#renderFromSdk();
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
-      this.#appendLog(`emitRequestTokenRefresh failed: ${message}`);
+      this.#appendLog(`emitRequestAuthTokenRefresh failed: ${message}`);
     }
   }
 
@@ -194,7 +194,7 @@ export class PlaygroundUI {
   }
 
   #setActionsEnabled(enabled: boolean): void {
-    this.#refreshBtn.disabled = !enabled;
+    this.#authTokenRefreshBtn.disabled = !enabled;
     this.#navPathInput.disabled = !enabled;
     this.#notifyNavBtn.disabled = !enabled;
     this.#apiEndpointInput.disabled = !enabled;

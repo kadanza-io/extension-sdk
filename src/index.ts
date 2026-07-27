@@ -8,6 +8,8 @@ export {
   resolveAllowedOrigin,
 } from "./origin";
 export type {
+  AuthToken,
+  AuthTokenRefreshPayload,
   ConnectOptions,
   DesignTokens,
   ExtensionDetails,
@@ -17,8 +19,6 @@ export type {
   PageSettings,
   PageSettingsUpdatedPayload,
   RequestOptions,
-  ScopedExtensionToken,
-  TokenRefreshPayload,
   UpdatePageSettingsPayload,
 } from "./types";
 

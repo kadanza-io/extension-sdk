@@ -1,7 +1,7 @@
 interface ApiRequestContext {
   baseUrl: string;
   tenantDomain: string;
-  token: string;
+  authTokenJwt: string;
 }
 
 function deriveApiUrl(baseUrl: string): string {
@@ -35,7 +35,7 @@ export async function callApi<T>(
     headers.set("Content-Type", "application/json");
   }
 
-  headers.set("Authorization", `Bearer ${context.token}`);
+  headers.set("Authorization", `Bearer ${context.authTokenJwt}`);
   headers.set("X-Tenant", context.tenantDomain);
 
   const response = await fetch(resolveApiEndpoint(context.baseUrl, endpoint), {

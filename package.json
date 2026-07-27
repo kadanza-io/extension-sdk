@@ -1,6 +1,6 @@
 {
   "name": "@kadanza/extension-sdk",
-  "version": "0.0.7",
+  "version": "0.0.8",
   "description": "Helpers for building extensions",
   "keywords": [
     "kadanza",

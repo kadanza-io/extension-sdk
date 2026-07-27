@@ -10,9 +10,9 @@ export const CONNECTION_EVENTS = {
   /** Parent → child: handshake success with auth and context. */
   handshakeAck: "HANDSHAKE_ACK",
   /** Child → parent: request a new auth token. */
-  requestTokenRefresh: "REQUEST_TOKEN_REFRESH",
+  requestAuthTokenRefresh: "REQUEST_TOKEN_REFRESH",
   /** Parent → child: new auth token (reply or push). */
-  tokenRefresh: "TOKEN_REFRESH",
+  authTokenRefresh: "TOKEN_REFRESH",
   /** Parent → child: open/load page settings UI with values. */
   loadPageSettings: "LOAD_PAGE_SETTINGS",
   /** Child → parent: persist updated page settings. */

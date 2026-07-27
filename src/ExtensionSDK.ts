@@ -3,6 +3,8 @@ import { CONNECTION_EVENTS } from "./events";
 import { postToParent, subscribeToParentMessages } from "./messaging";
 import { readTenantUrlFromLocation, resolveAllowedOrigin } from "./origin";
 import type {
+  AuthToken,
+  AuthTokenRefreshPayload,
   ConnectOptions,
   DesignTokens,
   ExtensionDetails,
@@ -12,8 +14,6 @@ import type {
   PageSettings,
   PageSettingsUpdatedPayload,
   RequestOptions,
-  ScopedExtensionToken,
-  TokenRefreshPayload,
   UpdatePageSettingsPayload,
 } from "./types";
 
@@ -57,7 +57,7 @@ export interface IExtensionSDK {
   readonly isConnected: boolean;
 
   /** Last auth token from handshake or refresh; `null` until connected. */
-  getAuthToken(): ScopedExtensionToken | null;
+  getAuthToken(): AuthToken | null;
 
   /** Extension context from handshake; `null` until connected. */
   getExtensionDetails(): ExtensionDetails | null;
@@ -86,15 +86,15 @@ export interface IExtensionSDK {
   apiCall<T>(endpoint: string, options?: RequestInit): Promise<T>;
 
   /**
-   * Asks the parent for a new token and waits for `TOKEN_REFRESH`.
+   * Asks the parent for a new auth token and waits for `TOKEN_REFRESH`.
    *
    * @param options - Optional request timeout (default 10s).
    * @throws When not connected, a refresh is already in progress,
    *   or the request times out / returns an invalid payload.
    */
-  emitRequestTokenRefresh(
+  emitRequestAuthTokenRefresh(
     options?: RequestOptions,
-  ): Promise<ScopedExtensionToken>;
+  ): Promise<AuthToken>;
 
   /**
    * Pushes page settings to the parent and waits for `PAGE_SETTINGS_UPDATED`.
@@ -117,11 +117,11 @@ export interface IExtensionSDK {
   onLoadPageSettings(handler: (settings: PageSettings) => void): () => void;
 
   /**
-   * Registers a handler for token updates (requested or parent-pushed).
+   * Registers a handler for auth-token updates (requested or parent-pushed).
    *
    * @returns Unsubscribe function.
    */
-  onTokenRefresh(handler: (token: ScopedExtensionToken) => void): () => void;
+  onAuthTokenRefresh(handler: (authToken: AuthToken) => void): () => void;
 
   /**
    * Notifies the parent that the extension's route changed.
@@ -147,7 +147,7 @@ export class ExtensionSDK implements IExtensionSDK {
   #connected = false;
   #destroyed = false;
 
-  #authToken: ScopedExtensionToken | null = null;
+  #authToken: AuthToken | null = null;
   #extensionDetails: ExtensionDetails | null = null;
   #designTokens: DesignTokens | null = null;
   #pageSettings: PageSettings | null = null;
@@ -158,11 +158,11 @@ export class ExtensionSDK implements IExtensionSDK {
   #authTokenRefreshRetryUsed = false;
 
   #pendingHandshake: Pending<HandshakePayload> | null = null;
-  #pendingTokenRefresh: Pending<ScopedExtensionToken> | null = null;
+  #pendingAuthTokenRefresh: Pending<AuthToken> | null = null;
   #pendingPageSettingsUpdate: Pending<PageSettingsUpdatedPayload> | null = null;
 
   #loadPageSettingsHandlers = new Set<(settings: PageSettings) => void>();
-  #tokenRefreshHandlers = new Set<(token: ScopedExtensionToken) => void>();
+  #authTokenRefreshHandlers = new Set<(authToken: AuthToken) => void>();
 
   get isConnected(): boolean {
     return this.#connected;
@@ -214,7 +214,7 @@ export class ExtensionSDK implements IExtensionSDK {
       this.#unsubscribe?.();
       this.#unsubscribe = null;
       this.#allowedOrigin = null;
-      this.#clearProactiveTokenRefreshTimer();
+      this.#clearProactiveAuthTokenRefreshTimer();
       throw error;
     }
 
@@ -225,7 +225,7 @@ export class ExtensionSDK implements IExtensionSDK {
     this.#destroyed = true;
     this.#connected = false;
 
-    this.#clearProactiveTokenRefreshTimer();
+    this.#clearProactiveAuthTokenRefreshTimer();
     this.#authTokenAutoRefresh = false;
     this.#authTokenRefreshRetryUsed = false;
 
@@ -234,14 +234,14 @@ export class ExtensionSDK implements IExtensionSDK {
     this.#allowedOrigin = null;
 
     this.#rejectPending(this.#pendingHandshake, new Error("SDK destroyed."));
-    this.#rejectPending(this.#pendingTokenRefresh, new Error("SDK destroyed."));
+    this.#rejectPending(this.#pendingAuthTokenRefresh, new Error("SDK destroyed."));
     this.#rejectPending(this.#pendingPageSettingsUpdate, new Error("SDK destroyed."));
     this.#pendingHandshake = null;
-    this.#pendingTokenRefresh = null;
+    this.#pendingAuthTokenRefresh = null;
     this.#pendingPageSettingsUpdate = null;
 
     this.#loadPageSettingsHandlers.clear();
-    this.#tokenRefreshHandlers.clear();
+    this.#authTokenRefreshHandlers.clear();
 
     this.#authToken = null;
     this.#extensionDetails = null;
@@ -249,7 +249,7 @@ export class ExtensionSDK implements IExtensionSDK {
     this.#pageSettings = null;
   }
 
-  getAuthToken(): ScopedExtensionToken | null {
+  getAuthToken(): AuthToken | null {
     return this.#authToken;
   }
 
@@ -276,34 +276,34 @@ export class ExtensionSDK implements IExtensionSDK {
       {
         baseUrl: this.#extensionDetails!.baseUrl,
         tenantDomain: this.#extensionDetails!.tenantDomain,
-        token: this.#authToken!.jwt,
+        authTokenJwt: this.#authToken!.jwt,
       },
       options,
     );
   }
 
-  async emitRequestTokenRefresh(
+  async emitRequestAuthTokenRefresh(
     options: RequestOptions = {},
-  ): Promise<ScopedExtensionToken> {
+  ): Promise<AuthToken> {
     this.#assertConnected();
 
-    if (this.#pendingTokenRefresh) {
-      throw new Error("Token refresh already in progress.");
+    if (this.#pendingAuthTokenRefresh) {
+      throw new Error("Auth token refresh already in progress.");
     }
 
     const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
     const allowedOrigin = this.#allowedOrigin!;
 
-    const promise = new Promise<ScopedExtensionToken>((resolve, reject) => {
+    const promise = new Promise<AuthToken>((resolve, reject) => {
       const timer = setTimeout(() => {
-        this.#pendingTokenRefresh = null;
-        reject(new Error(`Token refresh timed out after ${timeoutMs}ms.`));
+        this.#pendingAuthTokenRefresh = null;
+        reject(new Error(`Auth token refresh timed out after ${timeoutMs}ms.`));
       }, timeoutMs);
 
-      this.#pendingTokenRefresh = { resolve, reject, timer };
+      this.#pendingAuthTokenRefresh = { resolve, reject, timer };
     });
 
-    postToParent(CONNECTION_EVENTS.requestTokenRefresh, allowedOrigin);
+    postToParent(CONNECTION_EVENTS.requestAuthTokenRefresh, allowedOrigin);
     return promise;
   }
 
@@ -340,10 +340,10 @@ export class ExtensionSDK implements IExtensionSDK {
     };
   }
 
-  onTokenRefresh(handler: (token: ScopedExtensionToken) => void): () => void {
-    this.#tokenRefreshHandlers.add(handler);
+  onAuthTokenRefresh(handler: (authToken: AuthToken) => void): () => void {
+    this.#authTokenRefreshHandlers.add(handler);
     return () => {
-      this.#tokenRefreshHandlers.delete(handler);
+      this.#authTokenRefreshHandlers.delete(handler);
     };
   }
 
@@ -363,8 +363,8 @@ export class ExtensionSDK implements IExtensionSDK {
       case CONNECTION_EVENTS.handshakeAck:
         this.#handleHandshakeAck(payload as HandshakePayload | undefined);
         break;
-      case CONNECTION_EVENTS.tokenRefresh:
-        this.#handleTokenRefresh(payload as TokenRefreshPayload | undefined);
+      case CONNECTION_EVENTS.authTokenRefresh:
+        this.#handleAuthTokenRefresh(payload as AuthTokenRefreshPayload | undefined);
         break;
       case CONNECTION_EVENTS.loadPageSettings:
         this.#handleLoadPageSettings(payload as PageSettings | undefined);
@@ -405,31 +405,31 @@ export class ExtensionSDK implements IExtensionSDK {
     });
 
     this.#authTokenRefreshRetryUsed = false;
-    this.#scheduleProactiveTokenRefresh();
+    this.#scheduleProactiveAuthTokenRefresh();
   }
 
-  #handleTokenRefresh(payload: TokenRefreshPayload | undefined): void {
+  #handleAuthTokenRefresh(payload: AuthTokenRefreshPayload | undefined): void {
     if (!payload?.authToken) {
       this.#rejectPending(
-        this.#pendingTokenRefresh,
+        this.#pendingAuthTokenRefresh,
         new Error("Invalid TOKEN_REFRESH payload."),
       );
-      this.#pendingTokenRefresh = null;
+      this.#pendingAuthTokenRefresh = null;
       return;
     }
 
     this.#authToken = payload.authToken;
 
-    const pending = this.#pendingTokenRefresh;
-    this.#pendingTokenRefresh = null;
+    const pending = this.#pendingAuthTokenRefresh;
+    this.#pendingAuthTokenRefresh = null;
     this.#resolvePending(pending, this.#authToken);
 
-    for (const handler of this.#tokenRefreshHandlers) {
+    for (const handler of this.#authTokenRefreshHandlers) {
       handler(this.#authToken);
     }
 
     this.#authTokenRefreshRetryUsed = false;
-    this.#scheduleProactiveTokenRefresh();
+    this.#scheduleProactiveAuthTokenRefresh();
   }
 
   #handleLoadPageSettings(payload: PageSettings | undefined): void {
@@ -487,34 +487,34 @@ export class ExtensionSDK implements IExtensionSDK {
     this.#authTokenBufferMs =
       options.authTokenBufferMs ?? DEFAULT_AUTH_TOKEN_BUFFER_MS;
     this.#authTokenRefreshRetryUsed = false;
-    this.#clearProactiveTokenRefreshTimer();
+    this.#clearProactiveAuthTokenRefreshTimer();
   }
 
-  #parseExpiresAtMs(token: ScopedExtensionToken): number | null {
-    const expiresSec = Number(token.expires);
+  #parseExpiresAtMs(authToken: AuthToken): number | null {
+    const expiresSec = Number(authToken.expires);
     if (!Number.isFinite(expiresSec)) {
       return null;
     }
     return expiresSec * 1000;
   }
 
-  #getProactiveRefreshDelayMs(token: ScopedExtensionToken): number | null {
-    const expiresAtMs = this.#parseExpiresAtMs(token);
+  #getProactiveRefreshDelayMs(authToken: AuthToken): number | null {
+    const expiresAtMs = this.#parseExpiresAtMs(authToken);
     if (expiresAtMs === null) {
       return null;
     }
     return Math.max(0, expiresAtMs - this.#authTokenBufferMs - Date.now());
   }
 
-  #clearProactiveTokenRefreshTimer(): void {
+  #clearProactiveAuthTokenRefreshTimer(): void {
     if (this.#authTokenRefreshTimer !== null) {
       clearTimeout(this.#authTokenRefreshTimer);
       this.#authTokenRefreshTimer = null;
     }
   }
 
-  #scheduleProactiveTokenRefresh(): void {
-    this.#clearProactiveTokenRefreshTimer();
+  #scheduleProactiveAuthTokenRefresh(): void {
+    this.#clearProactiveAuthTokenRefreshTimer();
 
     if (
       !this.#authTokenAutoRefresh ||
@@ -533,11 +533,11 @@ export class ExtensionSDK implements IExtensionSDK {
     const clampedDelay = Math.min(delayMs, MAX_TIMEOUT_MS);
     this.#authTokenRefreshTimer = setTimeout(() => {
       this.#authTokenRefreshTimer = null;
-      void this.#runProactiveTokenRefresh();
+      void this.#runProactiveAuthTokenRefresh();
     }, clampedDelay);
   }
 
-  async #runProactiveTokenRefresh(): Promise<void> {
+  async #runProactiveAuthTokenRefresh(): Promise<void> {
     if (
       !this.#authTokenAutoRefresh ||
       !this.#connected ||
@@ -547,35 +547,35 @@ export class ExtensionSDK implements IExtensionSDK {
       return;
     }
 
-    const tokenAtRequest = this.#authToken;
-    const delayMs = this.#getProactiveRefreshDelayMs(tokenAtRequest);
+    const authTokenAtRequest = this.#authToken;
+    const delayMs = this.#getProactiveRefreshDelayMs(authTokenAtRequest);
     if (delayMs === null) {
       return;
     }
 
     if (delayMs > 0) {
-      this.#scheduleProactiveTokenRefresh();
+      this.#scheduleProactiveAuthTokenRefresh();
       return;
     }
 
-    if (this.#pendingTokenRefresh) {
-      this.#handleProactiveRefreshFailure(tokenAtRequest);
+    if (this.#pendingAuthTokenRefresh) {
+      this.#handleProactiveAuthTokenRefreshFailure(authTokenAtRequest);
       return;
     }
 
     try {
-      await this.emitRequestTokenRefresh();
+      await this.emitRequestAuthTokenRefresh();
     } catch {
-      this.#handleProactiveRefreshFailure(tokenAtRequest);
+      this.#handleProactiveAuthTokenRefreshFailure(authTokenAtRequest);
     }
   }
 
-  #handleProactiveRefreshFailure(tokenAtRequest: ScopedExtensionToken): void {
+  #handleProactiveAuthTokenRefreshFailure(authTokenAtRequest: AuthToken): void {
     if (
       !this.#authTokenAutoRefresh ||
       !this.#connected ||
       this.#destroyed ||
-      this.#authToken?.jwt !== tokenAtRequest.jwt
+      this.#authToken?.jwt !== authTokenAtRequest.jwt
     ) {
       return;
     }
@@ -584,7 +584,7 @@ export class ExtensionSDK implements IExtensionSDK {
       return;
     }
 
-    const expiresAtMs = this.#parseExpiresAtMs(tokenAtRequest);
+    const expiresAtMs = this.#parseExpiresAtMs(authTokenAtRequest);
     if (expiresAtMs === null) {
       return;
     }
@@ -595,12 +595,12 @@ export class ExtensionSDK implements IExtensionSDK {
     }
 
     this.#authTokenRefreshRetryUsed = true;
-    this.#clearProactiveTokenRefreshTimer();
+    this.#clearProactiveAuthTokenRefreshTimer();
 
     const retryDelay = Math.min(AUTO_REFRESH_RETRY_DELAY_MS, remainingMs);
     this.#authTokenRefreshTimer = setTimeout(() => {
       this.#authTokenRefreshTimer = null;
-      void this.#runProactiveTokenRefresh();
+      void this.#runProactiveAuthTokenRefresh();
     }, retryDelay);
   }
 

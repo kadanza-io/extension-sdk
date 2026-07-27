@@ -1,7 +1,7 @@
 import type { ConnectionEvent } from "./events";
 
-/** Scoped extension token issued by the parent (`authToken` on the wire). */
-export interface ScopedExtensionToken {
+/** Auth token issued by the parent (`authToken` on the wire). */
+export interface AuthToken {
   jwt: string;
   /** Unix expiry seconds as a string, per parent payload. */
   expires: string;
@@ -32,15 +32,15 @@ export type PageSettings = Record<string, unknown>;
 
 /** Payload delivered with a successful `HANDSHAKE_ACK`. */
 export interface HandshakePayload {
-  authToken: ScopedExtensionToken;
+  authToken: AuthToken;
   extensionDetails: ExtensionDetails;
   designTokens: DesignTokens;
   pageSettings: PageSettings | null;
 }
 
 /** Payload for `TOKEN_REFRESH` (requested or parent-pushed). */
-export interface TokenRefreshPayload {
-  authToken: ScopedExtensionToken;
+export interface AuthTokenRefreshPayload {
+  authToken: AuthToken;
 }
 
 /** Payload for `PAGE_SETTINGS_UPDATED` after a page settings update request. */
@@ -69,23 +69,24 @@ export interface ConnectOptions {
   /** Handshake timeout in milliseconds (default 10_000). */
   timeoutMs?: number;
   /**
-   * Enables proactive token refresh. After the handshake, the SDK reads the
-   * token's Unix-seconds `expires` value and arms a one-shot timer for
-   * `expires - authTokenBufferMs`; it does not run a polling interval.
+   * Enables proactive auth-token refresh. After the handshake, the SDK reads
+   * the auth token's Unix-seconds `expires` value and arms a one-shot timer
+   * for `expires - authTokenBufferMs`; it does not run a polling interval.
    *
-   * Every successful manual, automatic, or parent-pushed token update cancels
-   * the previous timer and schedules a new one from the new token's expiry.
-   * If an automatic request fails, it retries once after 30 seconds while the
-   * same token is still current and unexpired. {@link ExtensionSDK.destroy}
-   * clears the timer. Missing or invalid expiry values disable scheduling for
-   * that token without failing the connection.
+   * Every successful manual, automatic, or parent-pushed auth-token update
+   * cancels the previous timer and schedules a new one from the new auth
+   * auth token's expiry. If an automatic request fails, it retries once after 30
+   * seconds while the same auth token is still current and unexpired.
+   * {@link ExtensionSDK.destroy} clears the timer. Missing or invalid expiry
+   * values disable scheduling for that auth token without failing the
+   * connection.
    *
    * Default: `false`.
    */
   authTokenAutoRefresh?: boolean;
   /**
-   * How many milliseconds before token expiry the one-shot refresh timer
-   * should fire. Must be finite and non-negative. If the token is already
+   * How many milliseconds before auth-token expiry the one-shot refresh timer
+   * should fire. Must be finite and non-negative. If the auth token is already
    * inside this buffer when received, refresh is requested immediately.
    *
    * Default: `120_000` (2 minutes). Ignored unless

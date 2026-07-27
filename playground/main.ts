@@ -5,7 +5,7 @@ import { PlaygroundUI } from "./PlaygroundUI";
 
 const sdk = createExtensionSDK();
 const ui = new PlaygroundUI(sdk, {
-  onEmitRequestTokenRefresh: () => sdk.emitRequestTokenRefresh(),
+  onEmitRequestAuthTokenRefresh: () => sdk.emitRequestAuthTokenRefresh(),
   onEmitUpdatePageSettings: (payload) => sdk.emitUpdatePageSettings(payload),
   onEmitNavigationChange: (payload) => sdk.emitNavigationChange(payload),
   onApiCall: (endpoint) => sdk.apiCall<unknown>(endpoint),
@@ -15,8 +15,8 @@ sdk.onLoadPageSettings((settings) => {
   ui.pageSettingsLoaded(settings);
 });
 
-sdk.onTokenRefresh((token) => {
-  ui.tokenRefreshed(token);
+sdk.onAuthTokenRefresh((authToken) => {
+  ui.authTokenRefreshed(authToken);
 });
 
 window.addEventListener("pagehide", () => {

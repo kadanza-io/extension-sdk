@@ -22,7 +22,7 @@ See [`HandshakePayload`](https://kadanza-io.github.io/extension-sdk/interfaces/H
 
 Calls the Kadanza Platform API with connection details managed by the SDK.
 The API origin is derived from `extensionDetails.baseUrl`; the latest auth
-token and tenant domain are added as `Authorization` and `X-Tenant` headers.
+token JWT and tenant domain are added as `Authorization` and `X-Tenant` headers.
 
 ```ts
 interface User {
@@ -44,7 +44,7 @@ const asset = await sdk.apiCall<Asset>("/platform/v1/api/assets", {
 Endpoints must be root-relative paths beginning with a single `/`. Successful
 responses are parsed as JSON. Non-2xx responses throw with the HTTP status.
 A `401` is not retried automatically; use
-[`emitRequestTokenRefresh()`](https://kadanza-io.github.io/extension-sdk/interfaces/IExtensionSDK.html#emitrequesttokenrefresh)
+[`emitRequestAuthTokenRefresh()`](https://kadanza-io.github.io/extension-sdk/interfaces/IExtensionSDK.html#emitrequestauthtokenrefresh)
 when an explicit refresh is needed.
 
 The SDK owns the `Authorization` and `X-Tenant` headers. Other fetch options and
@@ -52,7 +52,7 @@ headers can be supplied through `RequestInit`.
 
 See [`apiCall`](https://kadanza-io.github.io/extension-sdk/interfaces/IExtensionSDK.html#apicall).
 
-## Token refresh
+## Auth token refresh
 
 Asks the parent for a new auth token, or listens when the parent pushes one.
 
@@ -60,11 +60,11 @@ Wire: `REQUEST_TOKEN_REFRESH` → `TOKEN_REFRESH`
 
 ```ts
 // Request a refresh
-const token = await sdk.emitRequestTokenRefresh();
+const authToken = await sdk.emitRequestAuthTokenRefresh();
 
-// Also listen for any token update (requested or parent-pushed)
-sdk.onTokenRefresh((token) => {
-  // use token.jwt
+// Also listen for any auth-token update (requested or parent-pushed)
+sdk.onAuthTokenRefresh((authToken) => {
+  // use authToken.jwt
 });
 ```
 
@@ -82,15 +82,15 @@ await sdk.connect({
 ```
 
 When enabled, the SDK schedules a one-shot timer from `authToken.expires`
-and calls [`emitRequestTokenRefresh()`](https://kadanza-io.github.io/extension-sdk/interfaces/IExtensionSDK.html#emitrequesttokenrefresh)
-before expiry. Handshake and every token update (manual, parent-pushed, or
+and calls [`emitRequestAuthTokenRefresh()`](https://kadanza-io.github.io/extension-sdk/interfaces/IExtensionSDK.html#emitrequestauthtokenrefresh)
+before expiry. Handshake and every auth-token update (manual, parent-pushed, or
 automatic) reschedule from the new expiry.
 
 If an automatic refresh fails or times out, the SDK retries once after 30
-seconds while the same token is still current and unexpired. The schedule
+seconds while the same auth token is still current and unexpired. The schedule
 is cleared by [`destroy()`](https://kadanza-io.github.io/extension-sdk/interfaces/IExtensionSDK.html#destroy).
 
-See [`emitRequestTokenRefresh`](https://kadanza-io.github.io/extension-sdk/interfaces/IExtensionSDK.html#emitrequesttokenrefresh) and [`onTokenRefresh`](https://kadanza-io.github.io/extension-sdk/interfaces/IExtensionSDK.html#ontokenrefresh).
+See [`emitRequestAuthTokenRefresh`](https://kadanza-io.github.io/extension-sdk/interfaces/IExtensionSDK.html#emitrequestauthtokenrefresh) and [`onAuthTokenRefresh`](https://kadanza-io.github.io/extension-sdk/interfaces/IExtensionSDK.html#onauthtokenrefresh).
 
 ## Page settings
 
