@@ -68,6 +68,30 @@ export interface ExtensionMessage<TPayload = unknown> {
 export interface ConnectOptions {
   /** Handshake timeout in milliseconds (default 10_000). */
   timeoutMs?: number;
+  /**
+   * Enables proactive token refresh. After the handshake, the SDK reads the
+   * token's Unix-seconds `expires` value and arms a one-shot timer for
+   * `expires - authTokenBufferMs`; it does not run a polling interval.
+   *
+   * Every successful manual, automatic, or parent-pushed token update cancels
+   * the previous timer and schedules a new one from the new token's expiry.
+   * If an automatic request fails, it retries once after 30 seconds while the
+   * same token is still current and unexpired. {@link ExtensionSDK.destroy}
+   * clears the timer. Missing or invalid expiry values disable scheduling for
+   * that token without failing the connection.
+   *
+   * Default: `false`.
+   */
+  authTokenAutoRefresh?: boolean;
+  /**
+   * How many milliseconds before token expiry the one-shot refresh timer
+   * should fire. Must be finite and non-negative. If the token is already
+   * inside this buffer when received, refresh is requested immediately.
+   *
+   * Default: `120_000` (2 minutes). Ignored unless
+   * {@link authTokenAutoRefresh} is enabled.
+   */
+  authTokenBufferMs?: number;
 }
 
 /** Options for request/response SDK methods that wait on a parent reply. */

@@ -68,6 +68,28 @@ sdk.onTokenRefresh((token) => {
 });
 ```
 
+### Proactive refresh
+
+Opt-in automatic refresh before expiry. Disabled by default.
+
+```ts
+await sdk.connect({
+  // optional; default is false
+  authTokenAutoRefresh: true,
+  // optional; default is 120_000 (2 minutes)
+  authTokenBufferMs: 2 * 60_000,
+});
+```
+
+When enabled, the SDK schedules a one-shot timer from `authToken.expires`
+and calls [`emitRequestTokenRefresh()`](https://kadanza-io.github.io/extension-sdk/interfaces/IExtensionSDK.html#emitrequesttokenrefresh)
+before expiry. Handshake and every token update (manual, parent-pushed, or
+automatic) reschedule from the new expiry.
+
+If an automatic refresh fails or times out, the SDK retries once after 30
+seconds while the same token is still current and unexpired. The schedule
+is cleared by [`destroy()`](https://kadanza-io.github.io/extension-sdk/interfaces/IExtensionSDK.html#destroy).
+
 See [`emitRequestTokenRefresh`](https://kadanza-io.github.io/extension-sdk/interfaces/IExtensionSDK.html#emitrequesttokenrefresh) and [`onTokenRefresh`](https://kadanza-io.github.io/extension-sdk/interfaces/IExtensionSDK.html#ontokenrefresh).
 
 ## Page settings

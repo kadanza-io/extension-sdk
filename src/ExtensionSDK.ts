@@ -18,6 +18,10 @@ import type {
 } from "./types";
 
 const DEFAULT_TIMEOUT_MS = 10_000;
+const DEFAULT_AUTH_TOKEN_BUFFER_MS = 120_000;
+const AUTO_REFRESH_RETRY_DELAY_MS = 30_000;
+/** Largest delay `setTimeout` can reliably use in browsers. */
+const MAX_TIMEOUT_MS = 2_147_483_647;
 
 /**
  * Public contract for talking to the Kadanza parent frame over `postMessage`.
@@ -33,7 +37,10 @@ export interface IExtensionSDK {
    * without sending another init. Concurrent calls while a handshake is
    * in progress throw.
    *
-   * @param options - Optional handshake timeout (default 10s).
+   * Opt-in proactive refresh can be enabled with
+   * `authTokenAutoRefresh: true` (optional `authTokenBufferMs`).
+   *
+   * @param options - Handshake timeout and optional auth-token auto-refresh.
    * @throws {InvalidOriginError} When `tenantUrl` is missing or invalid.
    * @throws When not embedded in a parent frame, already handshaking,
    *   destroyed, or the handshake times out / returns an invalid payload.
@@ -41,8 +48,8 @@ export interface IExtensionSDK {
   connect(options?: ConnectOptions): Promise<HandshakePayload>;
 
   /**
-   * Tears down listeners and cached state. Rejects any in-flight requests.
-   * The instance cannot be reused after destroy.
+   * Tears down listeners, proactive refresh timers, and cached state.
+   * Rejects any in-flight requests. The instance cannot be reused after destroy.
    */
   destroy(): void;
 
@@ -145,6 +152,11 @@ export class ExtensionSDK implements IExtensionSDK {
   #designTokens: DesignTokens | null = null;
   #pageSettings: PageSettings | null = null;
 
+  #authTokenAutoRefresh = false;
+  #authTokenBufferMs = DEFAULT_AUTH_TOKEN_BUFFER_MS;
+  #authTokenRefreshTimer: ReturnType<typeof setTimeout> | null = null;
+  #authTokenRefreshRetryUsed = false;
+
   #pendingHandshake: Pending<HandshakePayload> | null = null;
   #pendingTokenRefresh: Pending<ScopedExtensionToken> | null = null;
   #pendingPageSettingsUpdate: Pending<PageSettingsUpdatedPayload> | null = null;
@@ -171,6 +183,8 @@ export class ExtensionSDK implements IExtensionSDK {
     if (this.#pendingHandshake) {
       throw new Error("Handshake already in progress.");
     }
+
+    this.#configureAuthTokenAutoRefresh(options);
 
     const tenantUrl = readTenantUrlFromLocation();
     this.#allowedOrigin = resolveAllowedOrigin(tenantUrl);
@@ -200,6 +214,7 @@ export class ExtensionSDK implements IExtensionSDK {
       this.#unsubscribe?.();
       this.#unsubscribe = null;
       this.#allowedOrigin = null;
+      this.#clearProactiveTokenRefreshTimer();
       throw error;
     }
 
@@ -209,6 +224,10 @@ export class ExtensionSDK implements IExtensionSDK {
   destroy(): void {
     this.#destroyed = true;
     this.#connected = false;
+
+    this.#clearProactiveTokenRefreshTimer();
+    this.#authTokenAutoRefresh = false;
+    this.#authTokenRefreshRetryUsed = false;
 
     this.#unsubscribe?.();
     this.#unsubscribe = null;
@@ -384,6 +403,9 @@ export class ExtensionSDK implements IExtensionSDK {
       designTokens: this.#designTokens,
       pageSettings: this.#pageSettings,
     });
+
+    this.#authTokenRefreshRetryUsed = false;
+    this.#scheduleProactiveTokenRefresh();
   }
 
   #handleTokenRefresh(payload: TokenRefreshPayload | undefined): void {
@@ -405,6 +427,9 @@ export class ExtensionSDK implements IExtensionSDK {
     for (const handler of this.#tokenRefreshHandlers) {
       handler(this.#authToken);
     }
+
+    this.#authTokenRefreshRetryUsed = false;
+    this.#scheduleProactiveTokenRefresh();
   }
 
   #handleLoadPageSettings(payload: PageSettings | undefined): void {
@@ -444,6 +469,139 @@ export class ExtensionSDK implements IExtensionSDK {
     if (!this.#connected || !this.#allowedOrigin) {
       throw new Error("SDK is not connected. Call connect() first.");
     }
+  }
+
+  #configureAuthTokenAutoRefresh(options: ConnectOptions): void {
+    if (options.authTokenBufferMs !== undefined) {
+      if (
+        !Number.isFinite(options.authTokenBufferMs) ||
+        options.authTokenBufferMs < 0
+      ) {
+        throw new Error(
+          "authTokenBufferMs must be a finite non-negative number.",
+        );
+      }
+    }
+
+    this.#authTokenAutoRefresh = options.authTokenAutoRefresh === true;
+    this.#authTokenBufferMs =
+      options.authTokenBufferMs ?? DEFAULT_AUTH_TOKEN_BUFFER_MS;
+    this.#authTokenRefreshRetryUsed = false;
+    this.#clearProactiveTokenRefreshTimer();
+  }
+
+  #parseExpiresAtMs(token: ScopedExtensionToken): number | null {
+    const expiresSec = Number(token.expires);
+    if (!Number.isFinite(expiresSec)) {
+      return null;
+    }
+    return expiresSec * 1000;
+  }
+
+  #getProactiveRefreshDelayMs(token: ScopedExtensionToken): number | null {
+    const expiresAtMs = this.#parseExpiresAtMs(token);
+    if (expiresAtMs === null) {
+      return null;
+    }
+    return Math.max(0, expiresAtMs - this.#authTokenBufferMs - Date.now());
+  }
+
+  #clearProactiveTokenRefreshTimer(): void {
+    if (this.#authTokenRefreshTimer !== null) {
+      clearTimeout(this.#authTokenRefreshTimer);
+      this.#authTokenRefreshTimer = null;
+    }
+  }
+
+  #scheduleProactiveTokenRefresh(): void {
+    this.#clearProactiveTokenRefreshTimer();
+
+    if (
+      !this.#authTokenAutoRefresh ||
+      !this.#connected ||
+      this.#destroyed ||
+      !this.#authToken
+    ) {
+      return;
+    }
+
+    const delayMs = this.#getProactiveRefreshDelayMs(this.#authToken);
+    if (delayMs === null) {
+      return;
+    }
+
+    const clampedDelay = Math.min(delayMs, MAX_TIMEOUT_MS);
+    this.#authTokenRefreshTimer = setTimeout(() => {
+      this.#authTokenRefreshTimer = null;
+      void this.#runProactiveTokenRefresh();
+    }, clampedDelay);
+  }
+
+  async #runProactiveTokenRefresh(): Promise<void> {
+    if (
+      !this.#authTokenAutoRefresh ||
+      !this.#connected ||
+      this.#destroyed ||
+      !this.#authToken
+    ) {
+      return;
+    }
+
+    const tokenAtRequest = this.#authToken;
+    const delayMs = this.#getProactiveRefreshDelayMs(tokenAtRequest);
+    if (delayMs === null) {
+      return;
+    }
+
+    if (delayMs > 0) {
+      this.#scheduleProactiveTokenRefresh();
+      return;
+    }
+
+    if (this.#pendingTokenRefresh) {
+      this.#handleProactiveRefreshFailure(tokenAtRequest);
+      return;
+    }
+
+    try {
+      await this.emitRequestTokenRefresh();
+    } catch {
+      this.#handleProactiveRefreshFailure(tokenAtRequest);
+    }
+  }
+
+  #handleProactiveRefreshFailure(tokenAtRequest: ScopedExtensionToken): void {
+    if (
+      !this.#authTokenAutoRefresh ||
+      !this.#connected ||
+      this.#destroyed ||
+      this.#authToken?.jwt !== tokenAtRequest.jwt
+    ) {
+      return;
+    }
+
+    if (this.#authTokenRefreshRetryUsed) {
+      return;
+    }
+
+    const expiresAtMs = this.#parseExpiresAtMs(tokenAtRequest);
+    if (expiresAtMs === null) {
+      return;
+    }
+
+    const remainingMs = expiresAtMs - Date.now();
+    if (remainingMs <= 0) {
+      return;
+    }
+
+    this.#authTokenRefreshRetryUsed = true;
+    this.#clearProactiveTokenRefreshTimer();
+
+    const retryDelay = Math.min(AUTO_REFRESH_RETRY_DELAY_MS, remainingMs);
+    this.#authTokenRefreshTimer = setTimeout(() => {
+      this.#authTokenRefreshTimer = null;
+      void this.#runProactiveTokenRefresh();
+    }, retryDelay);
   }
 
   #clearPending(pending: { timer: ReturnType<typeof setTimeout> } | null): void {

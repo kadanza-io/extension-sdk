@@ -24,6 +24,6 @@ window.addEventListener("pagehide", () => {
 });
 
 void sdk
-  .connect()
+  .connect({ authTokenAutoRefresh: true })
   .then((payload) => ui.connected(payload))
   .catch((error: unknown) => ui.connectionFailed(error));
