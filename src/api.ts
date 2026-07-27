@@ -4,7 +4,8 @@ interface ApiRequestContext {
   authTokenJwt: string;
 }
 
-function deriveApiUrl(baseUrl: string): string {
+/** Derives the Platform API origin from handshake `baseUrl`. */
+export function deriveApiUrl(baseUrl: string): string {
   if (baseUrl.startsWith("/")) {
     return baseUrl;
   }

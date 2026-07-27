@@ -1,4 +1,4 @@
-import { callApi } from "./api";
+import { callApi, deriveApiUrl } from "./api";
 import { CONNECTION_EVENTS } from "./events";
 import { postToParent, subscribeToParentMessages } from "./messaging";
 import { readTenantUrlFromLocation, resolveAllowedOrigin } from "./origin";
@@ -72,6 +72,24 @@ export interface IExtensionSDK {
   getPageSettings(): PageSettings | null;
 
   /**
+   * Validated parent `postMessage` origin from `tenantUrl`;
+   * `null` until `connect` resolves it.
+   */
+  getAllowedOrigin(): string | null;
+
+  /**
+   * Raw `tenantUrl` search-param value used for the allowed origin;
+   * `null` until `connect` reads it.
+   */
+  getTenantUrl(): string | null;
+
+  /**
+   * Platform API origin derived from handshake `baseUrl`;
+   * `null` until connected.
+   */
+  getApiUrl(): string | null;
+
+  /**
    * Calls the Kadanza Platform API with the current connection credentials.
    *
    * The API origin is derived from the handshake `baseUrl`. Authorization and
@@ -143,6 +161,7 @@ type Pending<T> = {
 /** Default {@link IExtensionSDK} implementation. Prefer {@link createExtensionSDK}. */
 export class ExtensionSDK implements IExtensionSDK {
   #allowedOrigin: string | null = null;
+  #tenantUrl: string | null = null;
   #unsubscribe: (() => void) | null = null;
   #connected = false;
   #destroyed = false;
@@ -188,6 +207,7 @@ export class ExtensionSDK implements IExtensionSDK {
 
     const tenantUrl = readTenantUrlFromLocation();
     this.#allowedOrigin = resolveAllowedOrigin(tenantUrl);
+    this.#tenantUrl = tenantUrl;
 
     this.#unsubscribe?.();
     this.#unsubscribe = subscribeToParentMessages(
@@ -214,6 +234,7 @@ export class ExtensionSDK implements IExtensionSDK {
       this.#unsubscribe?.();
       this.#unsubscribe = null;
       this.#allowedOrigin = null;
+      this.#tenantUrl = null;
       this.#clearProactiveAuthTokenRefreshTimer();
       throw error;
     }
@@ -232,6 +253,7 @@ export class ExtensionSDK implements IExtensionSDK {
     this.#unsubscribe?.();
     this.#unsubscribe = null;
     this.#allowedOrigin = null;
+    this.#tenantUrl = null;
 
     this.#rejectPending(this.#pendingHandshake, new Error("SDK destroyed."));
     this.#rejectPending(this.#pendingAuthTokenRefresh, new Error("SDK destroyed."));
@@ -263,6 +285,22 @@ export class ExtensionSDK implements IExtensionSDK {
 
   getPageSettings(): PageSettings | null {
     return this.#pageSettings;
+  }
+
+  getAllowedOrigin(): string | null {
+    return this.#allowedOrigin;
+  }
+
+  getTenantUrl(): string | null {
+    return this.#tenantUrl;
+  }
+
+  getApiUrl(): string | null {
+    if (!this.#extensionDetails) {
+      return null;
+    }
+
+    return deriveApiUrl(this.#extensionDetails.baseUrl);
   }
 
   async apiCall<T>(

@@ -237,6 +237,9 @@ export class PlaygroundUI {
   #renderFromSdk(extra: Record<string, unknown> = {}): void {
     this.#renderState({
       isConnected: this.#sdk.isConnected,
+      allowedOrigin: this.#sdk.getAllowedOrigin(),
+      tenantUrl: this.#sdk.getTenantUrl(),
+      apiUrl: this.#sdk.getApiUrl(),
       authToken: this.#sdk.getAuthToken(),
       extensionDetails: this.#sdk.getExtensionDetails(),
       designTokens: this.#sdk.getDesignTokens(),

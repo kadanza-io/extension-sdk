@@ -18,6 +18,8 @@ const { authToken, extensionDetails, designTokens, pageSettings } =
 
 See [`HandshakePayload`](https://kadanza-io.github.io/extension-sdk/interfaces/HandshakePayload.html) for the returned data.
 
+After `connect` starts, [`getAllowedOrigin()`](https://kadanza-io.github.io/extension-sdk/interfaces/IExtensionSDK.html#getallowedorigin) and [`getTenantUrl()`](https://kadanza-io.github.io/extension-sdk/interfaces/IExtensionSDK.html#gettenanturl) expose the parent origin and raw `tenantUrl` search param. After handshake, [`getApiUrl()`](https://kadanza-io.github.io/extension-sdk/interfaces/IExtensionSDK.html#getapiurl) returns the Platform API origin.
+
 ## API calls
 
 Calls the Kadanza Platform API with connection details managed by the SDK.
@@ -51,6 +53,7 @@ The SDK owns the `Authorization` and `X-Tenant` headers. Other fetch options and
 headers can be supplied through `RequestInit`.
 
 See [`apiCall`](https://kadanza-io.github.io/extension-sdk/interfaces/IExtensionSDK.html#apicall).
+Use [`getApiUrl()`](https://kadanza-io.github.io/extension-sdk/interfaces/IExtensionSDK.html#getapiurl) when you need the derived API origin for custom requests.
 
 ## Auth token refresh
 
