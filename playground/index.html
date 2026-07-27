@@ -22,13 +22,28 @@
           <section class="action-group">
             <h2>Navigation change</h2>
             <div class="action-group-body">
-              <label class="nav-path">
+              <label class="action-field">
                 Path
                 <input id="nav-path" type="text" value="/demo" disabled />
               </label>
               <button id="notify-navigation" type="button" disabled>
                 Notify navigation change
               </button>
+            </div>
+          </section>
+          <section class="action-group">
+            <h2>API call</h2>
+            <div class="action-group-body">
+              <label class="action-field">
+                Endpoint
+                <input
+                  id="api-endpoint"
+                  type="text"
+                  value="/platform/v1/api/users/me"
+                  disabled
+                />
+              </label>
+              <button id="call-api" type="button" disabled>Call API</button>
             </div>
           </section>
         </div>

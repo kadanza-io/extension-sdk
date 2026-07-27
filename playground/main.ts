@@ -8,6 +8,7 @@ const ui = new PlaygroundUI(sdk, {
   onEmitRequestTokenRefresh: () => sdk.emitRequestTokenRefresh(),
   onEmitUpdatePageSettings: (payload) => sdk.emitUpdatePageSettings(payload),
   onEmitNavigationChange: (payload) => sdk.emitNavigationChange(payload),
+  onApiCall: (endpoint) => sdk.apiCall<unknown>(endpoint),
 });
 
 sdk.onLoadPageSettings((settings) => {

@@ -1,5 +1,6 @@
 import { copyFileSync } from "node:fs";
 import { resolve } from "node:path";
+import basicSsl from "@vitejs/plugin-basic-ssl";
 import { defineConfig } from "vite";
 import dts from "vite-plugin-dts";
 
@@ -19,6 +20,15 @@ export default defineConfig(({ command }) => {
     return {
       ...shared,
       root: "playground",
+      plugins: [basicSsl()],
+      server: {
+        port: 5000,
+        strictPort: true,
+      },
+      preview: {
+        port: 5000,
+        strictPort: true,
+      },
     };
   }
 

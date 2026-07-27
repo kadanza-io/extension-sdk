@@ -18,6 +18,40 @@ const { authToken, extensionDetails, designTokens, pageSettings } =
 
 See [`HandshakePayload`](https://kadanza-io.github.io/extension-sdk/interfaces/HandshakePayload.html) for the returned data.
 
+## API calls
+
+Calls the Kadanza Platform API with connection details managed by the SDK.
+The API origin is derived from `extensionDetails.baseUrl`; the latest auth
+token and tenant domain are added as `Authorization` and `X-Tenant` headers.
+
+```ts
+interface User {
+  firstName: string;
+  lastName: string;
+}
+
+const user = await sdk.apiCall<User>("/platform/v1/api/users/me");
+
+const asset = await sdk.apiCall<Asset>("/platform/v1/api/assets", {
+  method: "POST",
+  body: JSON.stringify({ name: "Example" }),
+  headers: {
+    "X-Custom-Header": "value",
+  },
+});
+```
+
+Endpoints must be root-relative paths beginning with a single `/`. Successful
+responses are parsed as JSON. Non-2xx responses throw with the HTTP status.
+A `401` is not retried automatically; use
+[`emitRequestTokenRefresh()`](https://kadanza-io.github.io/extension-sdk/interfaces/IExtensionSDK.html#emitrequesttokenrefresh)
+when an explicit refresh is needed.
+
+The SDK owns the `Authorization` and `X-Tenant` headers. Other fetch options and
+headers can be supplied through `RequestInit`.
+
+See [`apiCall`](https://kadanza-io.github.io/extension-sdk/interfaces/IExtensionSDK.html#apicall).
+
 ## Token refresh
 
 Asks the parent for a new auth token, or listens when the parent pushes one.

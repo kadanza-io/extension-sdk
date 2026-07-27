@@ -45,3 +45,7 @@ npm install
 | `npm run docs`        | Generate HTML API docs under `docs/api/`             |
 | `npm run docs:check`  | Validate TypeDoc without writing output              |
 | `npm run check:types` | Check published package types with arethetypeswrong  |
+
+`npm run dev` serves the playground at `https://localhost:5000` (accept the
+self-signed certificate warning once). Use this HTTPS origin for the parent
+iframe URL and add it to the API's CORS allowlist.

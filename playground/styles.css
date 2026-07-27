@@ -62,7 +62,7 @@ button:not(:disabled):hover {
 
 .controls {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.75rem;
   margin-top: 0.75rem;
   align-items: stretch;
@@ -91,22 +91,24 @@ button:not(:disabled):hover {
   align-items: center;
 }
 
-.nav-path {
+.action-field {
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
   font-size: 0.875rem;
+  flex: 1;
 }
 
-.nav-path input {
+.action-field input {
   border: 1px solid #c7d2fe;
   border-radius: 6px;
   padding: 0.4rem 0.5rem;
   font: inherit;
   min-width: 10rem;
+  width: 100%;
 }
 
-.nav-path input:disabled {
+.action-field input:disabled {
   opacity: 0.5;
 }
 
@@ -189,6 +191,7 @@ button:not(:disabled):hover {
 }
 
 @media (max-width: 800px) {
+  .controls,
   .columns {
     grid-template-columns: 1fr;
   }

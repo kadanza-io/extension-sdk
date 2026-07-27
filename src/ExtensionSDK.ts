@@ -1,3 +1,4 @@
+import { callApi } from "./api";
 import { CONNECTION_EVENTS } from "./events";
 import { postToParent, subscribeToParentMessages } from "./messaging";
 import { readTenantUrlFromLocation, resolveAllowedOrigin } from "./origin";
@@ -62,6 +63,20 @@ export interface IExtensionSDK {
    * `null` until set.
    */
   getPageSettings(): PageSettings | null;
+
+  /**
+   * Calls the Kadanza Platform API with the current connection credentials.
+   *
+   * The API origin is derived from the handshake `baseUrl`. Authorization and
+   * tenant headers are managed by the SDK and cannot be overridden.
+   *
+   * @typeParam T - Expected JSON response body.
+   * @param endpoint - Root-relative API path.
+   * @param options - Standard fetch options.
+   * @throws When not connected, the endpoint is invalid, the request fails,
+   *   or the response is not successful JSON.
+   */
+  apiCall<T>(endpoint: string, options?: RequestInit): Promise<T>;
 
   /**
    * Asks the parent for a new token and waits for `TOKEN_REFRESH`.
@@ -229,6 +244,23 @@ export class ExtensionSDK implements IExtensionSDK {
 
   getPageSettings(): PageSettings | null {
     return this.#pageSettings;
+  }
+
+  async apiCall<T>(
+    endpoint: string,
+    options: RequestInit = {},
+  ): Promise<T> {
+    this.#assertConnected();
+
+    return callApi<T>(
+      endpoint,
+      {
+        baseUrl: this.#extensionDetails!.baseUrl,
+        tenantDomain: this.#extensionDetails!.tenantDomain,
+        token: this.#authToken!.jwt,
+      },
+      options,
+    );
   }
 
   async emitRequestTokenRefresh(

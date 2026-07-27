@@ -16,6 +16,7 @@ export interface PlaygroundUIOptions {
     payload: UpdatePageSettingsPayload,
   ) => Promise<PageSettingsUpdatedPayload>;
   onEmitNavigationChange: (payload: NavigationChangePayload) => void;
+  onApiCall: (endpoint: string) => Promise<unknown>;
 }
 
 export interface PlaygroundUIState {
@@ -59,6 +60,8 @@ export class PlaygroundUI {
   readonly #refreshBtn: HTMLButtonElement;
   readonly #navPathInput: HTMLInputElement;
   readonly #notifyNavBtn: HTMLButtonElement;
+  readonly #apiEndpointInput: HTMLInputElement;
+  readonly #callApiBtn: HTMLButtonElement;
   readonly #logEntries: LogEntry[] = [];
 
   constructor(sdk: IExtensionSDK, options: PlaygroundUIOptions) {
@@ -69,6 +72,8 @@ export class PlaygroundUI {
     this.#refreshBtn = requireEl<HTMLButtonElement>("#refresh-token");
     this.#navPathInput = requireEl<HTMLInputElement>("#nav-path");
     this.#notifyNavBtn = requireEl<HTMLButtonElement>("#notify-navigation");
+    this.#apiEndpointInput = requireEl<HTMLInputElement>("#api-endpoint");
+    this.#callApiBtn = requireEl<HTMLButtonElement>("#call-api");
 
     this.#refreshBtn.addEventListener("click", () => {
       void this.#handleTokenRefresh();
@@ -76,6 +81,10 @@ export class PlaygroundUI {
 
     this.#notifyNavBtn.addEventListener("click", () => {
       this.#handleNotifyNavigation();
+    });
+
+    this.#callApiBtn.addEventListener("click", () => {
+      void this.#handleApiCall();
     });
   }
 
@@ -130,6 +139,28 @@ export class PlaygroundUI {
     }
   }
 
+  async #handleApiCall(): Promise<void> {
+    const endpoint = this.#apiEndpointInput.value.trim();
+
+    try {
+      const result = await this.#options.onApiCall(endpoint);
+      this.#appendLog(`apiCall resolved ${JSON.stringify(result)}`);
+      this.#renderFromSdk({
+        lastAction: "API_CALL",
+        lastApiEndpoint: endpoint,
+        lastApiResponse: result,
+      });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.#appendLog(`apiCall failed: ${message}`);
+      this.#renderFromSdk({
+        lastAction: "API_CALL",
+        lastApiEndpoint: endpoint,
+        lastApiError: message,
+      });
+    }
+  }
+
   async #promptAndUpdatePageSettings(): Promise<void> {
     const raw = window.prompt(
       "Enter page settings as a JSON object string:",
@@ -166,6 +197,8 @@ export class PlaygroundUI {
     this.#refreshBtn.disabled = !enabled;
     this.#navPathInput.disabled = !enabled;
     this.#notifyNavBtn.disabled = !enabled;
+    this.#apiEndpointInput.disabled = !enabled;
+    this.#callApiBtn.disabled = !enabled;
   }
 
   #appendLog(message: string): void {
