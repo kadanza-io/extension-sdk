@@ -10,8 +10,9 @@ Fill in `<APP_NAME>` and `<EXTENSION_BUILDERS_DESCRIBE_THEIR_ADDITIONAL_FEATURE_
 > It is a React + Vite + TypeScript app that uses @kadanza/extension-sdk and runs embedded in Kadanza.
 >
 > Before writing code, read and follow these sources of truth:
+>
 > - How the host embeds you: https://github.com/kadanza-io/extension-sdk/blob/main/docs/embedding.md
-> - React setup and wiring: https://github.com/kadanza-io/extension-sdk/blob/main/docs/react.md
+> - React setup and wiring: https://github.com/kadanza-io/extension-sdk/blob/main/docs/react-guide.md
 > - SDK flows you must support: https://github.com/kadanza-io/extension-sdk/blob/main/docs/flows.md
 >
 > Do not invent your own host communication, handshake, or API auth. Prefer the patterns and APIs described in those docs over improvising.
@@ -20,8 +21,9 @@ Fill in `<APP_NAME>` and `<EXTENSION_BUILDERS_DESCRIBE_THEIR_ADDITIONAL_FEATURE_
 > <EXTENSION_BUILDERS_DESCRIBE_THEIR_ADDITIONAL_FEATURE_REQUIREMENTS_HERE>
 >
 > When done, verify against the docs:
+>
 > - Embedding constraints in embedding.md are respected
-> - Structure matches react.md
+> - Structure matches react-guide.md
 > - Required flows from flows.md are implemented
 > - The app requirements above are covered
 
@@ -49,13 +51,13 @@ const { authToken, extensionDetails, designTokens } = await sdk.connect();
 
 Create and use the SDK once per app. Later `createExtensionSDK()` calls return the same instance.
 
-Check [Flows.md](/docs/flows.md) for all available flows. Building with React? See [Building a React extension](/docs/react.md).
+Check [Flows.md](/docs/flows.md) for all available flows. Building with React? See [Building a React extension](/docs/react-guide.md).
 
 ## Documentation
 
 - [Documentation folder](docs/) — This is were the important information is stored
 - [How Kadanza embeds an extension](docs/embedding.md) — Host iframe, allowed origins, and `tenantUrl`
-- [Building a React extension](docs/react.md) — Bootstrap the SDK in a React app
+- [Building a React extension](docs/react-guide.md) — Bootstrap a React app with the Extension SDK
 - [API reference](https://kadanza-io.github.io/extension-sdk/) — TypeDoc generated documentation describing all the small details, classes, interfaces, payloads...
 
 ## Local development
