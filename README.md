@@ -2,6 +2,29 @@
 
 Helpers for building Kadanza extensions
 
+## Quick start with AI
+
+Fill in `<APP_NAME>` and `<EXTENSION_BUILDERS_DESCRIBE_THEIR_ADDITIONAL_FEATURE_REQUIREMENTS_HERE>`, then paste this into Cursor, Lovable, or a similar AI tool.
+
+> You are building a Kadanza extension called "<APP_NAME>".
+> It is a React + Vite + TypeScript app that uses @kadanza/extension-sdk and runs embedded in Kadanza.
+>
+> Before writing code, read and follow these sources of truth:
+> - How the host embeds you: https://github.com/kadanza-io/extension-sdk/blob/main/docs/embedding.md
+> - React setup and wiring: https://github.com/kadanza-io/extension-sdk/blob/main/docs/react.md
+> - SDK flows you must support: https://github.com/kadanza-io/extension-sdk/blob/main/docs/flows.md
+>
+> Do not invent your own host communication, handshake, or API auth. Prefer the patterns and APIs described in those docs over improvising.
+>
+> App requirements (from the builder):
+> <EXTENSION_BUILDERS_DESCRIBE_THEIR_ADDITIONAL_FEATURE_REQUIREMENTS_HERE>
+>
+> When done, verify against the docs:
+> - Embedding constraints in embedding.md are respected
+> - Structure matches react.md
+> - Required flows from flows.md are implemented
+> - The app requirements above are covered
+
 ## Get started
 
 ### Install
@@ -31,6 +54,7 @@ Check [Flows.md](/docs/flows.md) for all available flows. Building with React? S
 ## Documentation
 
 - [Documentation folder](docs/) — This is were the important information is stored
+- [How Kadanza embeds an extension](docs/embedding.md) — Host iframe, allowed origins, and `tenantUrl`
 - [Building a React extension](docs/react.md) — Bootstrap the SDK in a React app
 - [API reference](https://kadanza-io.github.io/extension-sdk/) — TypeDoc generated documentation describing all the small details, classes, interfaces, payloads...
 
