@@ -1,4 +1,4 @@
-import { copyFileSync } from "node:fs";
+import { copyFileSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import basicSsl from "@vitejs/plugin-basic-ssl";
 import { defineConfig } from "vite";
@@ -6,9 +6,15 @@ import dts from "vite-plugin-dts";
 
 const rootDir = import.meta.dirname;
 const distDir = resolve(rootDir, "dist");
+const packageName = JSON.parse(
+  readFileSync(resolve(rootDir, "package.json"), "utf8"),
+).name;
 
 export default defineConfig(({ command }) => {
   const shared = {
+    define: {
+      __PACKAGE_NAME__: JSON.stringify(packageName),
+    },
     resolve: {
       alias: {
         "@kadanza/extension-sdk": resolve(rootDir, "src/index.ts"),

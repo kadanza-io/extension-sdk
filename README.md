@@ -24,11 +24,14 @@ const sdk: IExtensionSDK = createExtensionSDK();
 const { authToken, extensionDetails, designTokens } = await sdk.connect();
 ```
 
-Check [Flows.md](/docs/flows.md) for all available flows.
+Create and use the SDK once per app. Later `createExtensionSDK()` calls return the same instance.
+
+Check [Flows.md](/docs/flows.md) for all available flows. Building with React? See [Building a React extension](/docs/react.md).
 
 ## Documentation
 
 - [Documentation folder](docs/) — This is were the important information is stored
+- [Building a React extension](docs/react.md) — Bootstrap the SDK in a React app
 - [API reference](https://kadanza-io.github.io/extension-sdk/) — TypeDoc generated documentation describing all the small details, classes, interfaces, payloads...
 
 ## Local development

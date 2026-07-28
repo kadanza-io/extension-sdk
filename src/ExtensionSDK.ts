@@ -33,23 +33,28 @@ export interface IExtensionSDK {
   /**
    * Establishes the parent connection and waits for `HANDSHAKE_ACK`.
    *
-   * If already connected with cached handshake data, returns that payload
-   * without sending another init. Concurrent calls while a handshake is
-   * in progress throw.
+   * Safe to call repeatedly (e.g. from a React `useEffect` with deps):
+   * - Already connected: returns the cached handshake and re-applies
+   *   `authTokenAutoRefresh` / `authTokenBufferMs` without another init.
+   *   `timeoutMs` is ignored after connect.
+   * - Handshake in progress: returns the same in-flight promise. Options from
+   *   the first connecting call apply until the handshake completes.
    *
    * Opt-in proactive refresh can be enabled with
    * `authTokenAutoRefresh: true` (optional `authTokenBufferMs`).
    *
    * @param options - Handshake timeout and optional auth-token auto-refresh.
    * @throws {InvalidOriginError} When `tenantUrl` is missing or invalid.
-   * @throws When not embedded in a parent frame, already handshaking,
-   *   destroyed, or the handshake times out / returns an invalid payload.
+   * @throws When not embedded in a parent frame, destroyed, or the handshake
+   *   times out / returns an invalid payload.
    */
   connect(options?: ConnectOptions): Promise<HandshakePayload>;
 
   /**
    * Tears down listeners, proactive refresh timers, and cached state.
    * Rejects any in-flight requests. The instance cannot be reused after destroy.
+   * When created via {@link createExtensionSDK}, clears the singleton so a
+   * later create call can return a fresh instance.
    */
   destroy(): void;
 
@@ -177,6 +182,7 @@ export class ExtensionSDK implements IExtensionSDK {
   #authTokenRefreshRetryUsed = false;
 
   #pendingHandshake: Pending<HandshakePayload> | null = null;
+  #handshakePromise: Promise<HandshakePayload> | null = null;
   #pendingAuthTokenRefresh: Pending<AuthToken> | null = null;
   #pendingPageSettingsUpdate: Pending<PageSettingsUpdatedPayload> | null = null;
 
@@ -191,6 +197,8 @@ export class ExtensionSDK implements IExtensionSDK {
     this.#assertNotDestroyed();
 
     if (this.#connected && this.#authToken && this.#extensionDetails && this.#designTokens) {
+      this.#configureAuthTokenAutoRefresh(options);
+      this.#scheduleProactiveAuthTokenRefresh();
       return {
         authToken: this.#authToken,
         extensionDetails: this.#extensionDetails,
@@ -199,8 +207,8 @@ export class ExtensionSDK implements IExtensionSDK {
       };
     }
 
-    if (this.#pendingHandshake) {
-      throw new Error("Handshake already in progress.");
+    if (this.#handshakePromise) {
+      return this.#handshakePromise;
     }
 
     this.#configureAuthTokenAutoRefresh(options);
@@ -220,17 +228,20 @@ export class ExtensionSDK implements IExtensionSDK {
     const handshakePromise = new Promise<HandshakePayload>((resolve, reject) => {
       const timer = setTimeout(() => {
         this.#pendingHandshake = null;
+        this.#handshakePromise = null;
         reject(new Error(`Handshake timed out after ${timeoutMs}ms.`));
       }, timeoutMs);
 
       this.#pendingHandshake = { resolve, reject, timer };
     });
+    this.#handshakePromise = handshakePromise;
 
     try {
       postToParent(CONNECTION_EVENTS.handshakeInit, this.#allowedOrigin);
     } catch (error) {
       this.#clearPending(this.#pendingHandshake);
       this.#pendingHandshake = null;
+      this.#handshakePromise = null;
       this.#unsubscribe?.();
       this.#unsubscribe = null;
       this.#allowedOrigin = null;
@@ -259,6 +270,7 @@ export class ExtensionSDK implements IExtensionSDK {
     this.#rejectPending(this.#pendingAuthTokenRefresh, new Error("SDK destroyed."));
     this.#rejectPending(this.#pendingPageSettingsUpdate, new Error("SDK destroyed."));
     this.#pendingHandshake = null;
+    this.#handshakePromise = null;
     this.#pendingAuthTokenRefresh = null;
     this.#pendingPageSettingsUpdate = null;
 
@@ -424,6 +436,7 @@ export class ExtensionSDK implements IExtensionSDK {
         new Error("Invalid HANDSHAKE_ACK payload."),
       );
       this.#pendingHandshake = null;
+      this.#handshakePromise = null;
       return;
     }
 
@@ -435,6 +448,7 @@ export class ExtensionSDK implements IExtensionSDK {
 
     const pending = this.#pendingHandshake;
     this.#pendingHandshake = null;
+    this.#handshakePromise = null;
     this.#resolvePending(pending, {
       authToken: this.#authToken,
       extensionDetails: this.#extensionDetails,

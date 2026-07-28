@@ -8,6 +8,8 @@ Establishes the connection and receives the initial context from the parent.
 
 Wire: `HANDSHAKE_INIT` → `HANDSHAKE_ACK`
 
+[`createExtensionSDK()`](https://kadanza-io.github.io/extension-sdk/functions/createExtensionSDK.html) returns a singleton — use one SDK instance per app. Repeated [`connect()`](https://kadanza-io.github.io/extension-sdk/interfaces/IExtensionSDK.html#connect) calls are safe: an in-flight handshake shares one promise; after connect, the cached payload is returned and `authTokenAutoRefresh` / `authTokenBufferMs` are re-applied without another init.
+
 ```ts
 import { createExtensionSDK } from "@kadanza/extension-sdk";
 
@@ -132,7 +134,7 @@ See [`emitNavigationChange`](https://kadanza-io.github.io/extension-sdk/interfac
 
 ## Teardown
 
-Call [`destroy()`](https://kadanza-io.github.io/extension-sdk/interfaces/IExtensionSDK.html#destroy) when the extension unloads.
+Call [`destroy()`](https://kadanza-io.github.io/extension-sdk/interfaces/IExtensionSDK.html#destroy) when the extension unloads. That also clears the `createExtensionSDK` singleton so a later create call can return a fresh instance.
 
 ```ts
 window.addEventListener("pagehide", () => {
