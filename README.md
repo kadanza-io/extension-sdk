@@ -32,8 +32,17 @@ Fill in `<APP_NAME>` and `<EXTENSION_BUILDERS_DESCRIBE_THEIR_ADDITIONAL_FEATURE_
 ### Install
 
 ```bash
+# Stable
 npm install @kadanza/extension-sdk
+
+# RC (shared testing channel on main)
+npm install @kadanza/extension-sdk@rc
+
+# Canary (feature-branch preview — see releasing docs)
+npm install @kadanza/extension-sdk@canary
 ```
+
+How we version and publish: [Releasing](docs/releasing.md).
 
 ### Usage
 
@@ -58,6 +67,7 @@ Check [Flows.md](/docs/flows.md) for all available flows. Building with React? S
 - [Documentation folder](docs/) — This is were the important information is stored
 - [How Kadanza embeds an extension](docs/embedding.md) — Host iframe, allowed origins, and `tenantUrl`
 - [Building a React extension](docs/react-guide.md) — Bootstrap a React app with the Extension SDK
+- [Releasing](docs/releasing.md) — Changesets, stable and RC publishes
 - [API reference](https://kadanza-io.github.io/extension-sdk/) — TypeDoc generated documentation describing all the small details, classes, interfaces, payloads...
 
 ## Local development
@@ -66,14 +76,17 @@ Check [Flows.md](/docs/flows.md) for all available flows. Building with React? S
 npm install
 ```
 
-| Command               | Description                                          |
-| --------------------- | ---------------------------------------------------- |
-| `npm run dev`         | Serve the playground for embedding in the parent app |
-| `npm run build`       | Emit `dist/` (ESM + CJS + types)                     |
-| `npm run preview`     | Preview the production playground build              |
-| `npm run docs`        | Generate HTML API docs under `docs/api/`             |
-| `npm run docs:check`  | Validate TypeDoc without writing output              |
-| `npm run check:types` | Check published package types with arethetypeswrong  |
+| Command                   | Description                                          |
+| ------------------------- | ---------------------------------------------------- |
+| `npm run dev`             | Serve the playground for embedding in the parent app |
+| `npm run build`           | Emit `dist/` (ESM + CJS + types)                     |
+| `npm run preview`         | Preview the production playground build              |
+| `npm run docs`            | Generate HTML API docs under `docs/api/`             |
+| `npm run docs:check`      | Validate TypeDoc without writing output              |
+| `npm run check:types`     | Check published package types with arethetypeswrong  |
+| `npm run changeset`       | Add a changeset for the next release                 |
+| `npm run release:rc:enter`| Enter RC prerelease mode on `main`                   |
+| `npm run release:rc:exit` | Exit RC prerelease mode                              |
 
 `npm run dev` serves the playground at `https://localhost:5000` (accept the
 self-signed certificate warning once). Use this HTTPS origin for the parent

@@ -36,6 +36,9 @@
   "files": [
     "dist"
   ],
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "dev": "vite",
     "build": "tsc -p tsconfig.lib.json --noEmit && vite build",
@@ -43,9 +46,17 @@
     "docs": "typedoc",
     "docs:check": "typedoc --emit none",
     "check:types": "npx --yes @arethetypeswrong/cli --pack .",
+    "changeset": "changeset",
+    "version-packages": "changeset version",
+    "version-packages:snapshot": "changeset version --snapshot canary",
+    "release": "changeset publish",
+    "release:canary": "changeset publish --tag canary --no-git-tag",
+    "release:rc:enter": "changeset pre enter rc && node scripts/sync-rc-banner.mjs enter",
+    "release:rc:exit": "changeset pre exit && node scripts/sync-rc-banner.mjs exit",
     "prepublishOnly": "npm run build && npm run check:types"
   },
   "devDependencies": {
+    "@changesets/cli": "^2.31.1",
     "@vitejs/plugin-basic-ssl": "^2.3.0",
     "typedoc": "^0.28.20",
     "typescript": "~6.0.2",
