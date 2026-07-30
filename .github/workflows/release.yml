@@ -4,16 +4,19 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
 
 concurrency: ${{ github.workflow }}-${{ github.ref }}
 
 permissions:
   contents: write
   pull-requests: write
+  id-token: write
 
 jobs:
   release:
     name: Release
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -28,6 +31,9 @@ jobs:
           cache: npm
           registry-url: https://registry.npmjs.org
 
+      - name: Ensure npm supports OIDC
+        run: npm install -g npm@latest
+
       - name: Install
         run: npm ci
 
@@ -41,4 +47,56 @@ jobs:
           commit: "Version Packages"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  canary:
+    name: Publish canary snapshot
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+          cache: npm
+          registry-url: https://registry.npmjs.org
+
+      - name: Ensure npm supports OIDC
+        run: npm install -g npm@latest
+
+      - name: Install
+        run: npm ci
+
+      - name: Clear RC pre mode if present
+        run: rm -f .changeset/pre.json
+
+      - name: Require a changeset
+        run: |
+          shopt -s nullglob
+          changesets=(.changeset/*.md)
+          pending=()
+          for f in "${changesets[@]}"; do
+            [[ "$(basename "$f")" == "README.md" ]] && continue
+            pending+=("$f")
+          done
+          if [[ ${#pending[@]} -eq 0 ]]; then
+            echo "No changesets found. Add one with \`npm run changeset\` (or \`npx changeset add --empty\`) before publishing a canary."
+            exit 1
+          fi
+
+      - name: Version snapshot
+        run: npm run version-packages:snapshot
+
+      - name: Publish canary
+        run: npm run release:canary
+
+      - name: Print install hint
+        run: |
+          version=$(node -p "require('./package.json').version")
+          echo "Published @kadanza/extension-sdk@${version}"
+          echo "Install latest canary:  npm install @kadanza/extension-sdk@canary"
+          echo "Pin this build:        npm install @kadanza/extension-sdk@${version}"
