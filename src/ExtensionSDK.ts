@@ -410,22 +410,27 @@ export class ExtensionSDK implements IExtensionSDK {
     const { type, payload } = event.data;
 
     switch (type) {
-      case CONNECTION_EVENTS.handshakeAck:
+      case CONNECTION_EVENTS.handshakeAck: {
         this.#handleHandshakeAck(payload as HandshakePayload | undefined);
         break;
-      case CONNECTION_EVENTS.authTokenRefresh:
+      }
+      case CONNECTION_EVENTS.authTokenRefresh: {
         this.#handleAuthTokenRefresh(payload as AuthTokenRefreshPayload | undefined);
         break;
-      case CONNECTION_EVENTS.loadPageSettings:
+      }
+      case CONNECTION_EVENTS.loadPageSettings: {
         this.#handleLoadPageSettings(payload as PageSettings | undefined);
         break;
-      case CONNECTION_EVENTS.pageSettingsUpdated:
+      }
+      case CONNECTION_EVENTS.pageSettingsUpdated: {
         this.#handlePageSettingsUpdated(
           payload as PageSettingsUpdatedPayload | undefined,
         );
         break;
-      default:
+      }
+      default: {
         break;
+      }
     }
   }
 

@@ -1,7 +1,19 @@
 import { ExtensionSDK, type IExtensionSDK } from "./ExtensionSDK";
 
 export { ExtensionSDK, type IExtensionSDK } from "./ExtensionSDK";
+export {
+  ExtensionSDKHost,
+  createExtensionSDKHost,
+  type ExtensionSDKHostOptions,
+  type IExtensionSDKHost,
+} from "./ExtensionSDKHost";
 export { CONNECTION_EVENTS, type ConnectionEvent } from "./events";
+export {
+  postToChild,
+  subscribeToChildMessages,
+  type HostMessageHandler,
+} from "./hostMessaging";
+export { enrichExtensionUrl, isValidExtensionUrl } from "./hostUrl";
 export {
   InvalidOriginError,
   readTenantUrlFromLocation,
