@@ -22,3 +22,43 @@ Example after the host enriches `src`:
 - `tenantUrl=https://acme.kadanza.io` — parent origin, appended so the extension SDK can validate `postMessage` origins.
 
 The host sends and accepts `postMessage` only against the extension URL’s origin (`https://my-extension.kadanza.app` in the example).
+
+## Host integration
+
+The Kadanza parent app should use the host API from this package — do not reimplement the wire protocol.
+
+```ts
+import {
+  ExtensionSDKHost,
+  enrichExtensionUrl,
+  isValidExtensionUrl,
+  type HandshakePayload,
+} from "@kadanza/extension-sdk";
+
+if (!isValidExtensionUrl(extensionUrl)) {
+  throw new Error("Invalid extension URL");
+}
+
+const src = enrichExtensionUrl(extensionUrl)?.toString();
+
+const extensionSDKHost = new ExtensionSDKHost({
+  getContentWindow: () => iframe.contentWindow,
+  origin: new URL(extensionUrl).origin,
+  resolveHandshakePayload: async (): Promise<HandshakePayload> => {
+    // Mint / load auth token + context; return HandshakePayload
+  },
+  resolveAuthToken: async () => {
+    // Mint a fresh auth token for TOKEN_REFRESH
+  },
+  onUpdatePageSettings: async (settings) => {
+    // Persist settings; return true on success
+    return true;
+  },
+});
+
+extensionSDKHost.start();
+// Later: extensionSDKHost.emitLoadPageSettings(settings);
+// On teardown: extensionSDKHost.destroy();
+```
+
+Shared event names and payload shapes are documented in [Flows](flows.md). URL helpers (`isValidExtensionUrl`, `enrichExtensionUrl`) and low-level `postToChild` / `subscribeToChildMessages` are also exported for hosts that need them outside `ExtensionSDKHost`.
