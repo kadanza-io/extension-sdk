@@ -41,7 +41,7 @@ if (!isValidExtensionUrl(extensionUrl)) {
 
 const src = enrichExtensionUrl(extensionUrl)?.toString();
 
-const host = new ExtensionSDKHost({
+const extensionSDKHost = new ExtensionSDKHost({
   getContentWindow: () => iframe.contentWindow,
   origin: new URL(extensionUrl).origin,
   resolveHandshakePayload: async (): Promise<HandshakePayload> => {
@@ -56,9 +56,9 @@ const host = new ExtensionSDKHost({
   },
 });
 
-host.start();
-// Later: host.emitLoadPageSettings(settings);
-// On teardown: host.destroy();
+extensionSDKHost.start();
+// Later: extensionSDKHost.emitLoadPageSettings(settings);
+// On teardown: extensionSDKHost.destroy();
 ```
 
 Shared event names and payload shapes are documented in [Flows](flows.md). URL helpers (`isValidExtensionUrl`, `enrichExtensionUrl`) and low-level `postToChild` / `subscribeToChildMessages` are also exported for hosts that need them outside `ExtensionSDKHost`.
