@@ -10,7 +10,7 @@ import type {
 } from "./types";
 
 /**
- * Options for {@link createExtensionSDKHost} / {@link ExtensionSDKHost}.
+ * Options for {@link ExtensionSDKHost}.
  *
  * Platform code supplies token minting and page-settings persistence via
  * callbacks; the host owns only the postMessage protocol.
@@ -42,7 +42,7 @@ export interface ExtensionSDKHostOptions {
  * Parent-frame counterpart to {@link IExtensionSDK}.
  *
  * Listens for child messages and replies with the shared wire protocol.
- * Create one instance per iframe via {@link createExtensionSDKHost}.
+ * Create one instance per iframe.
  */
 export interface IExtensionSDKHost {
   /**
@@ -64,7 +64,7 @@ export interface IExtensionSDKHost {
   emitLoadPageSettings(settings: PageSettings | null): void;
 }
 
-/** Default {@link IExtensionSDKHost} implementation. Prefer {@link createExtensionSDKHost}. */
+/** Default {@link IExtensionSDKHost} implementation. */
 export class ExtensionSDKHost implements IExtensionSDKHost {
   #options: ExtensionSDKHostOptions;
   #unsubscribe: (() => void) | null = null;
@@ -200,16 +200,4 @@ export class ExtensionSDKHost implements IExtensionSDKHost {
       throw new Error("ExtensionSDKHost has been destroyed.");
     }
   }
-}
-
-/**
- * Creates a new {@link IExtensionSDKHost} for one iframe instance.
- *
- * Call {@link IExtensionSDKHost.start} after the iframe is available.
- * Not a singleton — create one host per embedded extension frame.
- */
-export function createExtensionSDKHost(
-  options: ExtensionSDKHostOptions,
-): IExtensionSDKHost {
-  return new ExtensionSDKHost(options);
 }

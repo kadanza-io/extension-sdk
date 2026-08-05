@@ -3,7 +3,6 @@ import { ExtensionSDK, type IExtensionSDK } from "./ExtensionSDK";
 export { ExtensionSDK, type IExtensionSDK } from "./ExtensionSDK";
 export {
   ExtensionSDKHost,
-  createExtensionSDKHost,
   type ExtensionSDKHostOptions,
   type IExtensionSDKHost,
 } from "./ExtensionSDKHost";

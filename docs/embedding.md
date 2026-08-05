@@ -29,7 +29,7 @@ The Kadanza parent app should use the host API from this package — do not reim
 
 ```ts
 import {
-  createExtensionSDKHost,
+  ExtensionSDKHost,
   enrichExtensionUrl,
   isValidExtensionUrl,
   type HandshakePayload,
@@ -41,7 +41,7 @@ if (!isValidExtensionUrl(extensionUrl)) {
 
 const src = enrichExtensionUrl(extensionUrl)?.toString();
 
-const host = createExtensionSDKHost({
+const host = new ExtensionSDKHost({
   getContentWindow: () => iframe.contentWindow,
   origin: new URL(extensionUrl).origin,
   resolveHandshakePayload: async (): Promise<HandshakePayload> => {
@@ -61,4 +61,4 @@ host.start();
 // On teardown: host.destroy();
 ```
 
-Shared event names and payload shapes are documented in [Flows](flows.md). URL helpers (`isValidExtensionUrl`, `enrichExtensionUrl`) and low-level `postToChild` / `subscribeToChildMessages` are also exported for hosts that need them outside `createExtensionSDKHost`.
+Shared event names and payload shapes are documented in [Flows](flows.md). URL helpers (`isValidExtensionUrl`, `enrichExtensionUrl`) and low-level `postToChild` / `subscribeToChildMessages` are also exported for hosts that need them outside `ExtensionSDKHost`.

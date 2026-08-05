@@ -65,7 +65,7 @@ Check [Flows.md](/docs/flows.md) for all available flows. Building with React? S
 ## Documentation
 
 - [Documentation folder](docs/) — This is were the important information is stored
-- [How Kadanza embeds an extension](docs/embedding.md) — Host iframe, allowed origins, `tenantUrl`, and host API (`createExtensionSDKHost`)
+- [How Kadanza embeds an extension](docs/embedding.md) — Host iframe, allowed origins, `tenantUrl`, and host API (`ExtensionSDKHost`)
 - [Building a React extension](docs/react-guide.md) — Bootstrap a React app with the Extension SDK
 - [Releasing](docs/releasing.md) — Changesets, stable and RC publishes
 - [API reference](https://kadanza-io.github.io/extension-sdk/) — TypeDoc generated documentation describing all the small details, classes, interfaces, payloads...
