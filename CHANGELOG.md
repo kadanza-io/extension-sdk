@@ -1,5 +1,11 @@
 # @kadanza/extension-sdk
 
+## 0.0.14
+
+### Patch Changes
+
+- 610bd6b: Add host-side extension logic
+
 ## 0.0.13
 
 ### Patch Changes
