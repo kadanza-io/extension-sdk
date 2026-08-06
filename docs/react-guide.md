@@ -10,7 +10,7 @@ cd my-extension
 npm install @kadanza/extension-sdk react-router-dom
 ```
 
-Use **`HashRouter`**, not `BrowserRouter`. The host adds `tenantUrl` to the iframe query string; hash routing keeps that query intact while your app navigates.
+Use **`HashRouter`**, not `BrowserRouter`. The host adds `tenantUrl` to the iframe query string; hash routing keeps that query intact while your app navigates. Pass `routingType: "client-hash"` on `connect` so the parent can soft-navigate without reloading the iframe.
 
 ## KadanzaExtensionSDKProvider
 
@@ -54,7 +54,10 @@ export function KadanzaExtensionSDKProvider({
 
     async function connectToParent() {
       try {
-        const payload = await sdk.connect({ authTokenAutoRefresh: true });
+        const payload = await sdk.connect({
+          routingType: "client-hash",
+          authTokenAutoRefresh: true,
+        });
 
         if (cancelled) {
           return;
@@ -214,16 +217,23 @@ The SDK attaches auth and tenant headers. More detail: [API calls](flows.md#api-
 
 ## Navigation sync
 
-Notify the parent when the extension route changes:
+Notify the parent when the extension route changes, and handle host-driven soft navigation:
 
 ```tsx
 import { useEffect } from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useKadanzaExtensionSDK } from "./KadanzaExtensionSDKContext";
 
 export function KadanzaNavigationTracker() {
   const { sdk } = useKadanzaExtensionSDK();
   const location = useLocation();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    return sdk.onNavigate(({ path }) => {
+      navigate(path);
+    });
+  }, [sdk, navigate]);
 
   useEffect(() => {
     sdk.emitNavigationChange({ path: location.pathname });
@@ -233,7 +243,7 @@ export function KadanzaNavigationTracker() {
 }
 ```
 
-Place `<KadanzaNavigationTracker />` next to your routes inside the ready gate. See [Navigation change](flows.md#navigation-change).
+Place `<KadanzaNavigationTracker />` next to your routes inside the ready gate. See [Navigation](flows.md#navigation).
 
 ## Page settings
 

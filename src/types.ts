@@ -30,6 +30,35 @@ export interface DesignTokens {
 /** Opaque page-level settings bag owned by the extension and synced with the parent. */
 export type PageSettings = Record<string, unknown>;
 
+/**
+ * How the extension handles in-app routing.
+ *
+ * - `server` — full document loads (iframe `src` reload). Default.
+ * - `client-hash` — hash router SPA; supports soft navigation via
+ *   `REQUEST_NAVIGATION_CHANGE` / `NAVIGATION_CHANGE`.
+ */
+export type RoutingType = "server" | "client-hash";
+
+/** Default when `routingType` is omitted or unrecognized. */
+export const DEFAULT_ROUTING_TYPE: RoutingType = "server";
+
+/** Normalize a wire / option value to a known {@link RoutingType}. */
+export function normalizeRoutingType(value: unknown): RoutingType {
+  if (value === "client-hash") {
+    return "client-hash";
+  }
+  return DEFAULT_ROUTING_TYPE;
+}
+
+/** Payload for `HANDSHAKE_INIT` (child → parent). */
+export interface HandshakeInitPayload {
+  /**
+   * Declares how the extension routes. Omit or unknown → `server`.
+   * Soft navigation requires `client-hash`.
+   */
+  routingType?: RoutingType;
+}
+
 /** Payload delivered with a successful `HANDSHAKE_ACK`. */
 export interface HandshakePayload {
   authToken: AuthToken;
@@ -53,8 +82,15 @@ export interface UpdatePageSettingsPayload {
   settings: PageSettings;
 }
 
+/** Payload for `REQUEST_NAVIGATION_CHANGE` (parent → child). */
+export interface RequestNavigationChangePayload {
+  /** Path within the extension (e.g. `/settings`). */
+  path: string;
+}
+
 /** Payload for `NAVIGATION_CHANGE` (child → parent). */
 export interface NavigationChangePayload {
+  /** Path within the extension (e.g. `/settings`). */
   path: string;
 }
 
@@ -68,6 +104,11 @@ export interface ExtensionMessage<TPayload = unknown> {
 export interface ConnectOptions {
   /** Handshake timeout in milliseconds (default 10_000). */
   timeoutMs?: number;
+  /**
+   * Routing mode announced to the parent on `HANDSHAKE_INIT`.
+   * HashRouter SPAs should pass `client-hash`. Default: `server`.
+   */
+  routingType?: RoutingType;
   /**
    * Enables proactive auth-token refresh. After the handshake, the SDK reads
    * the auth token's Unix-seconds `expires` value and arms a one-shot timer

@@ -54,9 +54,15 @@ const extensionSDKHost = new ExtensionSDKHost({
     // Persist settings; return true on success
     return true;
   },
+  onNavigationChange: ({ path }) => {
+    // Child reported a route change — sync host URL / sidebar
+  },
 });
 
 extensionSDKHost.start();
+// After handshake: extensionSDKHost.getRoutingType() // "server" | "client-hash"
+// Soft nav (when routingType is client-hash):
+//   await extensionSDKHost.requestNavigationChange({ path: "/settings" });
 // Later: extensionSDKHost.emitLoadPageSettings(settings);
 // On teardown: extensionSDKHost.destroy();
 ```

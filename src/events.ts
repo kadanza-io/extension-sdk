@@ -19,7 +19,9 @@ export const CONNECTION_EVENTS = {
   updatePageSettings: "UPDATE_PAGE_SETTINGS",
   /** Parent → child: result of a page settings update. */
   pageSettingsUpdated: "PAGE_SETTINGS_UPDATED",
-  /** Child → parent: extension route changed. */
+  /** Parent → child: ask the SPA to navigate without reloading the iframe. */
+  requestNavigationChange: "REQUEST_NAVIGATION_CHANGE",
+  /** Child → parent: extension route changed (ack or spontaneous). */
   navigationChange: "NAVIGATION_CHANGE",
 } as const;
 

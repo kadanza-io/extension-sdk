@@ -15,10 +15,22 @@ import { createExtensionSDK } from "@kadanza/extension-sdk";
 
 const sdk = createExtensionSDK();
 const { authToken, extensionDetails, designTokens, pageSettings } =
-  await sdk.connect();
+  await sdk.connect({
+    // HashRouter SPAs: enable soft navigation from the parent
+    routingType: "client-hash",
+  });
 ```
 
-See [`HandshakePayload`](https://kadanza-io.github.io/extension-sdk/interfaces/HandshakePayload.html) for the returned data.
+`HANDSHAKE_INIT` includes `{ routingType }`. Supported values:
+
+| Value | Meaning |
+| --- | --- |
+| `server` | Default. Full page loads via iframe `src` reload. |
+| `client-hash` | Hash-router SPA. Parent may soft-navigate with `REQUEST_NAVIGATION_CHANGE`. |
+
+Omit or unrecognized → `server`.
+
+See [`HandshakePayload`](https://kadanza-io.github.io/extension-sdk/interfaces/HandshakePayload.html) for the ACK data and [`HandshakeInitPayload`](https://kadanza-io.github.io/extension-sdk/interfaces/HandshakeInitPayload.html) for the INIT payload.
 
 After `connect` starts, [`getAllowedOrigin()`](https://kadanza-io.github.io/extension-sdk/interfaces/IExtensionSDK.html#getallowedorigin) and [`getTenantUrl()`](https://kadanza-io.github.io/extension-sdk/interfaces/IExtensionSDK.html#gettenanturl) expose the parent origin and raw `tenantUrl` search param. After handshake, [`getApiUrl()`](https://kadanza-io.github.io/extension-sdk/interfaces/IExtensionSDK.html#getapiurl) returns the Platform API origin.
 
@@ -115,22 +127,49 @@ const { success } = await sdk.emitUpdatePageSettings({
 
 See [`onLoadPageSettings`](https://kadanza-io.github.io/extension-sdk/interfaces/IExtensionSDK.html#onloadpagesettings) and [`emitUpdatePageSettings`](https://kadanza-io.github.io/extension-sdk/interfaces/IExtensionSDK.html#emitupdatepagesettings).
 
-## Navigation change
+## Navigation
 
-Notifies the parent when the extension's route/path changes. Fire-and-forget; no ACK.
+Bidirectional route sync between the parent host and the extension SPA.
+
+### Child → parent
+
+Notifies the parent when the extension's route changes. Fire-and-forget; also used as the ACK after handling a host request.
 
 Wire: `NAVIGATION_CHANGE` (child → parent)
 
-`tenantUrl` is read and validated by [`connect()`](https://kadanza-io.github.io/extension-sdk/interfaces/IExtensionSDK.html#connect) — builders only pass the path.
-
 ```ts
-await sdk.connect();
+await sdk.connect({ routingType: "client-hash" });
 
-// Call whenever your app's path changes
+// Call whenever your app's path changes (and after handling onNavigate)
 sdk.emitNavigationChange({ path: "/demo" });
 ```
 
-See [`emitNavigationChange`](https://kadanza-io.github.io/extension-sdk/interfaces/IExtensionSDK.html#emitnavigationchange).
+### Parent → child
+
+The host asks the SPA to navigate without reloading the iframe. Soft navigation is intended when handshake declared `routingType: "client-hash"`; otherwise the host should reload iframe `src`.
+
+Wire: `REQUEST_NAVIGATION_CHANGE` (parent → child) → `NAVIGATION_CHANGE` (ACK)
+
+```ts
+// Extension
+sdk.onNavigate(({ path }) => {
+  // navigate your router, then ACK
+  sdk.emitNavigationChange({ path });
+});
+
+// Host
+const { path } = await extensionSDKHost.requestNavigationChange(
+  { path: "/settings" },
+  // optional; default 10_000
+  { timeoutMs: 10_000 },
+);
+// Or listen for spontaneous child navigations:
+// onNavigationChange: ({ path }) => { /* update host URL */ }
+```
+
+`getRoutingType()` on the host returns the last INIT value (`server` until connect).
+
+See [`emitNavigationChange`](https://kadanza-io.github.io/extension-sdk/interfaces/IExtensionSDK.html#emitnavigationchange), [`onNavigate`](https://kadanza-io.github.io/extension-sdk/interfaces/IExtensionSDK.html#onnavigate), and [`requestNavigationChange`](https://kadanza-io.github.io/extension-sdk/interfaces/IExtensionSDKHost.html#requestnavigationchange).
 
 ## Teardown
 
