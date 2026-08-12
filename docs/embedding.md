@@ -44,7 +44,10 @@ const src = enrichExtensionUrl(extensionUrl)?.toString();
 const extensionSDKHost = new ExtensionSDKHost({
   getContentWindow: () => iframe.contentWindow,
   origin: new URL(extensionUrl).origin,
-  resolveHandshakePayload: async (): Promise<HandshakePayload> => {
+  resolveHandshakePayload: async (
+    extensionSDKHost,
+  ): Promise<HandshakePayload> => {
+    const routingType = extensionSDKHost.getRoutingType();
     // Mint / load auth token + context; return HandshakePayload
   },
   resolveAuthToken: async () => {
@@ -60,7 +63,6 @@ const extensionSDKHost = new ExtensionSDKHost({
 });
 
 extensionSDKHost.start();
-// After handshake: extensionSDKHost.getRoutingType() // "server" | "client-hash"
 // Soft nav (when routingType is client-hash):
 //   await extensionSDKHost.requestNavigationChange({ path: "/settings" });
 // Later: extensionSDKHost.emitLoadPageSettings(settings);

@@ -167,7 +167,9 @@ const { path } = await extensionSDKHost.requestNavigationChange(
 // onNavigationChange: ({ path }) => { /* update host URL */ }
 ```
 
-`getRoutingType()` on the host returns the last INIT value (`server` until connect).
+`resolveHandshakePayload` receives the `extensionSDKHost` after INIT is
+processed, so `extensionSDKHost.getRoutingType()` returns the current value
+while building the ACK payload (`server` when omitted or unrecognized).
 
 See [`emitNavigationChange`](https://kadanza-io.github.io/extension-sdk/interfaces/IExtensionSDK.html#emitnavigationchange), [`onNavigate`](https://kadanza-io.github.io/extension-sdk/interfaces/IExtensionSDK.html#onnavigate), and [`requestNavigationChange`](https://kadanza-io.github.io/extension-sdk/interfaces/IExtensionSDKHost.html#requestnavigationchange).
 

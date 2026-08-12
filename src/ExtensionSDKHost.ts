@@ -33,7 +33,9 @@ export interface ExtensionSDKHostOptions {
    * Builds the handshake payload (including auth token) when the child sends
    * `HANDSHAKE_INIT`.
    */
-  resolveHandshakePayload: () => HandshakePayload | Promise<HandshakePayload>;
+  resolveHandshakePayload: (
+    extensionSDKHost: IExtensionSDKHost,
+  ) => HandshakePayload | Promise<HandshakePayload>;
   /**
    * Resolves a fresh auth token when the child sends `REQUEST_TOKEN_REFRESH`.
    */
@@ -226,7 +228,8 @@ export class ExtensionSDKHost implements IExtensionSDKHost {
     this.#routingType = normalizeRoutingType(payload?.routingType);
 
     try {
-      const handshakePayload = await this.#options.resolveHandshakePayload();
+      const handshakePayload =
+        await this.#options.resolveHandshakePayload(this);
       if (this.#destroyed) {
         return;
       }
