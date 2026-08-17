@@ -140,9 +140,14 @@ Wire: `NAVIGATION_CHANGE` (child → parent)
 ```ts
 await sdk.connect({ routingType: "client-hash" });
 
-// Call whenever your app's path changes (and after handling onNavigate)
-sdk.emitNavigationChange({ path: "/demo" });
+// Call whenever your app's path changes (and after handling onNavigate).
+// Include `search` (leading `?`) so the host can restore query params on reload.
+sdk.emitNavigationChange({ path: "/demo", search: "?tab=history" });
 ```
+
+`search` is optional and defaults to `""` (no query). For `client-hash`
+extensions the query lives inside the hash fragment, so read it from there
+rather than `window.location.search` when reporting.
 
 ### Parent → child
 
@@ -152,20 +157,23 @@ Wire: `REQUEST_NAVIGATION_CHANGE` (parent → child) → `NAVIGATION_CHANGE` (AC
 
 ```ts
 // Extension
-sdk.onNavigate(({ path }) => {
-  // navigate your router, then ACK
-  sdk.emitNavigationChange({ path });
+sdk.onNavigate(({ path, search }) => {
+  // navigate your router (apply `search` too), then ACK with the same route
+  sdk.emitNavigationChange({ path, search });
 });
 
 // Host
-const { path } = await extensionSDKHost.requestNavigationChange(
-  { path: "/settings" },
+const { path, search } = await extensionSDKHost.requestNavigationChange(
+  { path: "/settings", search: "?tab=history" },
   // optional; default 10_000
   { timeoutMs: 10_000 },
 );
 // Or listen for spontaneous child navigations:
-// onNavigationChange: ({ path }) => { /* update host URL */ }
+// onNavigationChange: ({ path, search }) => { /* update host URL */ }
 ```
+
+The ACK is correlated on `path` **and** `search`, so a query-only change
+(same path, different `search`) resolves the matching request.
 
 `resolveHandshakePayload` receives the `extensionSDKHost` after INIT is
 processed, so `extensionSDKHost.getRoutingType()` returns the current value

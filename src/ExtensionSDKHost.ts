@@ -14,9 +14,18 @@ import type {
   RoutingType,
   UpdatePageSettingsPayload,
 } from "./types";
-import { DEFAULT_ROUTING_TYPE, normalizeRoutingType } from "./types";
+import {
+  DEFAULT_ROUTING_TYPE,
+  normalizeNavigationSearch,
+  normalizeRoutingType,
+} from "./types";
 
 const DEFAULT_TIMEOUT_MS = 10_000;
+
+/** Correlation key for a navigation request/ACK (path + normalized query). */
+function navigationKey(path: string, search?: string): string {
+  return `${path}\u0000${normalizeNavigationSearch(search)}`;
+}
 
 /**
  * Options for {@link ExtensionSDKHost}.
@@ -173,7 +182,7 @@ export class ExtensionSDKHost implements IExtensionSDKHost {
     const pending = PendingRequest.create<NavigationChangePayload, string>({
       timeoutMs,
       timeoutMessage: `Navigation change timed out after ${timeoutMs}ms.`,
-      context: payload.path,
+      context: navigationKey(payload.path, payload.search),
       onSettle: () => {
         if (this.#pendingNavigationChange === pending) {
           this.#pendingNavigationChange = null;
@@ -285,9 +294,9 @@ export class ExtensionSDKHost implements IExtensionSDKHost {
       return;
     }
 
-    if (
-      this.#pendingNavigationChange?.matches((path) => path === payload.path)
-    ) {
+    const key = navigationKey(payload.path, payload.search);
+
+    if (this.#pendingNavigationChange?.matches((context) => context === key)) {
       this.#pendingNavigationChange.resolve(payload);
     }
 

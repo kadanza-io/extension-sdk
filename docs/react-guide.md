@@ -230,14 +230,17 @@ export function KadanzaNavigationTracker() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    return sdk.onNavigate(({ path }) => {
-      navigate(path);
+    return sdk.onNavigate(({ path, search }) => {
+      navigate(`${path}${search ?? ""}`);
     });
   }, [sdk, navigate]);
 
   useEffect(() => {
-    sdk.emitNavigationChange({ path: location.pathname });
-  }, [sdk, location.pathname]);
+    sdk.emitNavigationChange({
+      path: location.pathname,
+      search: location.search,
+    });
+  }, [sdk, location.pathname, location.search]);
 
   return null;
 }

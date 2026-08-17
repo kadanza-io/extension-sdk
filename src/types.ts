@@ -86,12 +86,41 @@ export interface UpdatePageSettingsPayload {
 export interface RequestNavigationChangePayload {
   /** Path within the extension (e.g. `/settings`). */
   path: string;
+  /**
+   * Query string for the target route, including the leading `?`
+   * (e.g. `?tab=history`). Omitted or empty means no query.
+   *
+   * For `client-hash` extensions the query belongs inside the hash fragment;
+   * the child SDK consumer is responsible for applying it to its router.
+   */
+  search?: string;
 }
 
 /** Payload for `NAVIGATION_CHANGE` (child → parent). */
 export interface NavigationChangePayload {
   /** Path within the extension (e.g. `/settings`). */
   path: string;
+  /**
+   * Query string of the child's current route, including the leading `?`
+   * (e.g. `?tab=history`). Omitted or empty means no query.
+   *
+   * For `client-hash` extensions the child reads this from its hash fragment,
+   * not from `window.location.search`.
+   */
+  search?: string;
+}
+
+/**
+ * Normalizes a route query string for the navigation contract.
+ *
+ * Returns `""` for missing / empty input, otherwise guarantees a single
+ * leading `?` (e.g. `tab=1` → `?tab=1`, `?tab=1` → `?tab=1`).
+ */
+export function normalizeNavigationSearch(value: unknown): string {
+  if (typeof value !== "string" || value === "" || value === "?") {
+    return "";
+  }
+  return value.startsWith("?") ? value : `?${value}`;
 }
 
 /** Envelope for parent/child `postMessage` traffic. */
