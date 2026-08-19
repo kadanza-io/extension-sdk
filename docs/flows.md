@@ -18,9 +18,38 @@ const { authToken, extensionDetails, designTokens, pageSettings } =
   await sdk.connect();
 ```
 
-See [`HandshakePayload`](https://kadanza-io.github.io/extension-sdk/interfaces/HandshakePayload.html) for the returned data.
+Handshake completes when the parent ACKs. Context fields are optional and
+normalized to `null` when the host omits them. Use a field only when that
+surface provides it (for example `spaceId` / `pageId` on Experience Pages).
+
+See [`HandshakePayload`](https://kadanza-io.github.io/extension-sdk/interfaces/HandshakePayload.html).
 
 After `connect` starts, [`getAllowedOrigin()`](https://kadanza-io.github.io/extension-sdk/interfaces/IExtensionSDK.html#getallowedorigin) and [`getTenantUrl()`](https://kadanza-io.github.io/extension-sdk/interfaces/IExtensionSDK.html#gettenanturl) expose the parent origin and raw `tenantUrl` search param. After handshake, [`getApiUrl()`](https://kadanza-io.github.io/extension-sdk/interfaces/IExtensionSDK.html#getapiurl) returns the Platform API origin.
+
+## Design tokens
+
+[`designTokens`](https://kadanza-io.github.io/extension-sdk/interfaces/DesignTokens.html) is tenant branding for aligning extension UI with the host. The parent should send it whenever a tenant is in context (Experience Pages and Admin Console). It is **not** required to complete handshake.
+
+| Token | Typical host source | Suggested use |
+| --- | --- | --- |
+| `primaryColor` | Tenant palette primary | Accents, buttons, links |
+| `fontFamily` | Tenant font family | Body and UI type |
+| `borderRadius` | Tenant roundness | Controls and cards |
+
+Individual values may be missing when the tenant has no setting. Apply them only when present:
+
+```ts
+const { designTokens } = await sdk.connect();
+
+if (designTokens?.primaryColor) {
+  document.documentElement.style.setProperty(
+    "--extension-primary",
+    designTokens.primaryColor,
+  );
+}
+```
+
+Read the cached copy later with [`getDesignTokens()`](https://kadanza-io.github.io/extension-sdk/interfaces/IExtensionSDK.html#getdesigntokens).
 
 ## API calls
 

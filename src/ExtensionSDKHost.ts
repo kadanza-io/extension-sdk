@@ -21,10 +21,12 @@ export interface ExtensionSDKHostOptions {
   /** Extension origin used as `postMessage` targetOrigin / source filter. */
   origin: string;
   /**
-   * Builds the handshake payload (including auth token) when the child sends
-   * `HANDSHAKE_INIT`.
+   * Builds the handshake payload when the child sends `HANDSHAKE_INIT`.
+   * Context fields are optional; send `designTokens` whenever a tenant is in
+   * context. `spaceId` / `pageId` apply to Experience Pages only.
    */
-  resolveHandshakePayload: () => HandshakePayload | Promise<HandshakePayload>;
+  resolveHandshakePayload: () =>
+    Partial<HandshakePayload> | Promise<Partial<HandshakePayload>>;
   /**
    * Resolves a fresh auth token when the child sends `REQUEST_TOKEN_REFRESH`.
    */

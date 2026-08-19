@@ -17,6 +17,10 @@ import type {
   UpdatePageSettingsPayload,
 } from "./types";
 
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
 const DEFAULT_TIMEOUT_MS = 10_000;
 const DEFAULT_AUTH_TOKEN_BUFFER_MS = 120_000;
 const AUTO_REFRESH_RETRY_DELAY_MS = 30_000;
@@ -43,10 +47,16 @@ export interface IExtensionSDK {
    * Opt-in proactive refresh can be enabled with
    * `authTokenAutoRefresh: true` (optional `authTokenBufferMs`).
    *
+   * Handshake completes when the parent sends `HANDSHAKE_ACK`. Context fields
+   * (`authToken`, `extensionDetails`, `designTokens`, `pageSettings`) are
+   * optional — omitted values are `null`. Use them only when the current host
+   * surface provides them (e.g. `spaceId` / `pageId` on Experience Pages,
+   * `designTokens` when a tenant is in context).
+   *
    * @param options - Handshake timeout and optional auth-token auto-refresh.
    * @throws {InvalidOriginError} When `tenantUrl` is missing or invalid.
    * @throws When not embedded in a parent frame, destroyed, or the handshake
-   *   times out / returns an invalid payload.
+   *   times out.
    */
   connect(options?: ConnectOptions): Promise<HandshakePayload>;
 
@@ -61,13 +71,22 @@ export interface IExtensionSDK {
   /** Whether a successful handshake has completed and not been destroyed. */
   readonly isConnected: boolean;
 
-  /** Last auth token from handshake or refresh; `null` until connected. */
+  /**
+   * Last auth token from handshake or refresh.
+   * `null` until connected, or when the host omitted it.
+   */
   getAuthToken(): AuthToken | null;
 
-  /** Extension context from handshake; `null` until connected. */
+  /**
+   * Extension context from handshake.
+   * `null` until connected, or when the host omitted it.
+   */
   getExtensionDetails(): ExtensionDetails | null;
 
-  /** Design tokens from handshake; `null` until connected. */
+  /**
+   * Tenant branding from handshake.
+   * `null` until connected, or when the host omitted it.
+   */
   getDesignTokens(): DesignTokens | null;
 
   /**
@@ -89,8 +108,8 @@ export interface IExtensionSDK {
   getTenantUrl(): string | null;
 
   /**
-   * Platform API origin derived from handshake `baseUrl`;
-   * `null` until connected.
+   * Platform API origin derived from handshake `baseUrl`.
+   * `null` until connected, or when `extensionDetails.baseUrl` was omitted.
    */
   getApiUrl(): string | null;
 
@@ -103,8 +122,9 @@ export interface IExtensionSDK {
    * @typeParam T - Expected JSON response body.
    * @param endpoint - Root-relative API path.
    * @param options - Standard fetch options.
-   * @throws When not connected, the endpoint is invalid, the request fails,
-   *   or the response is not successful JSON.
+   * @throws When not connected, handshake did not include `authToken` and
+   *   `extensionDetails` (`baseUrl`, `tenantDomain`), the endpoint is invalid,
+   *   the request fails, or the response is not successful JSON.
    */
   apiCall<T>(endpoint: string, options?: RequestInit): Promise<T>;
 
@@ -196,15 +216,10 @@ export class ExtensionSDK implements IExtensionSDK {
   async connect(options: ConnectOptions = {}): Promise<HandshakePayload> {
     this.#assertNotDestroyed();
 
-    if (this.#connected && this.#authToken && this.#extensionDetails && this.#designTokens) {
+    if (this.#connected) {
       this.#configureAuthTokenAutoRefresh(options);
       this.#scheduleProactiveAuthTokenRefresh();
-      return {
-        authToken: this.#authToken,
-        extensionDetails: this.#extensionDetails,
-        designTokens: this.#designTokens,
-        pageSettings: this.#pageSettings,
-      };
+      return this.#toHandshakePayload();
     }
 
     if (this.#handshakePromise) {
@@ -308,11 +323,16 @@ export class ExtensionSDK implements IExtensionSDK {
   }
 
   getApiUrl(): string | null {
-    if (!this.#extensionDetails) {
+    const baseUrl = this.#extensionDetails?.baseUrl;
+    if (!baseUrl) {
       return null;
     }
 
-    return deriveApiUrl(this.#extensionDetails.baseUrl);
+    try {
+      return deriveApiUrl(baseUrl);
+    } catch {
+      return null;
+    }
   }
 
   async apiCall<T>(
@@ -321,12 +341,22 @@ export class ExtensionSDK implements IExtensionSDK {
   ): Promise<T> {
     this.#assertConnected();
 
+    const baseUrl = this.#extensionDetails?.baseUrl;
+    const tenantDomain = this.#extensionDetails?.tenantDomain;
+    const authTokenJwt = this.#authToken?.jwt;
+
+    if (!baseUrl || !tenantDomain || !authTokenJwt) {
+      throw new Error(
+        "API calls require handshake authToken and extensionDetails (baseUrl, tenantDomain).",
+      );
+    }
+
     return callApi<T>(
       endpoint,
       {
-        baseUrl: this.#extensionDetails!.baseUrl,
-        tenantDomain: this.#extensionDetails!.tenantDomain,
-        authTokenJwt: this.#authToken!.jwt,
+        baseUrl,
+        tenantDomain,
+        authTokenJwt,
       },
       options,
     );
@@ -434,32 +464,34 @@ export class ExtensionSDK implements IExtensionSDK {
     }
   }
 
-  #handleHandshakeAck(payload: HandshakePayload | undefined): void {
-    if (!payload?.authToken || !payload.extensionDetails || !payload.designTokens) {
-      this.#rejectPending(
-        this.#pendingHandshake,
-        new Error("Invalid HANDSHAKE_ACK payload."),
-      );
-      this.#pendingHandshake = null;
-      this.#handshakePromise = null;
-      return;
-    }
+  #toHandshakePayload(): HandshakePayload {
+    return {
+      authToken: this.#authToken,
+      extensionDetails: this.#extensionDetails,
+      designTokens: this.#designTokens,
+      pageSettings: this.#pageSettings,
+    };
+  }
 
-    this.#authToken = payload.authToken;
-    this.#extensionDetails = payload.extensionDetails;
-    this.#designTokens = payload.designTokens;
-    this.#pageSettings = payload.pageSettings ?? null;
+  #handleHandshakeAck(payload: HandshakePayload | undefined): void {
+    this.#authToken = isPlainObject(payload?.authToken)
+      ? (payload?.authToken as AuthToken)
+      : null;
+    this.#extensionDetails = isPlainObject(payload?.extensionDetails)
+      ? (payload?.extensionDetails as ExtensionDetails)
+      : null;
+    this.#designTokens = isPlainObject(payload?.designTokens)
+      ? (payload?.designTokens as DesignTokens)
+      : null;
+    this.#pageSettings = isPlainObject(payload?.pageSettings)
+      ? (payload?.pageSettings as PageSettings)
+      : null;
     this.#connected = true;
 
     const pending = this.#pendingHandshake;
     this.#pendingHandshake = null;
     this.#handshakePromise = null;
-    this.#resolvePending(pending, {
-      authToken: this.#authToken,
-      extensionDetails: this.#extensionDetails,
-      designTokens: this.#designTokens,
-      pageSettings: this.#pageSettings,
-    });
+    this.#resolvePending(pending, this.#toHandshakePayload());
 
     this.#authTokenRefreshRetryUsed = false;
     this.#scheduleProactiveAuthTokenRefresh();
