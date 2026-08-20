@@ -1,13 +1,31 @@
 import { CONNECTION_EVENTS } from "./events";
 import { postToChild, subscribeToChildMessages } from "./hostMessaging";
+import { PendingRequest } from "./PendingRequest";
 import type {
   AuthToken,
   ExtensionMessage,
+  HandshakeInitPayload,
   HandshakePayload,
+  NavigationChangePayload,
   PageSettings,
   PageSettingsUpdatedPayload,
+  RequestNavigationChangePayload,
+  RequestOptions,
+  RoutingType,
   UpdatePageSettingsPayload,
 } from "./types";
+import {
+  DEFAULT_ROUTING_TYPE,
+  normalizeNavigationSearch,
+  normalizeRoutingType,
+} from "./types";
+
+const DEFAULT_TIMEOUT_MS = 10_000;
+
+/** Correlation key for a navigation request/ACK (path + normalized query). */
+function navigationKey(path: string, search?: string): string {
+  return `${path}\u0000${normalizeNavigationSearch(search)}`;
+}
 
 /**
  * Options for {@link ExtensionSDKHost}.
@@ -25,8 +43,9 @@ export interface ExtensionSDKHostOptions {
    * Context fields are optional; send `designTokens` whenever a tenant is in
    * context. `spaceId` / `pageId` apply to Experience Pages only.
    */
-  resolveHandshakePayload: () =>
-    Partial<HandshakePayload> | Promise<Partial<HandshakePayload>>;
+  resolveHandshakePayload: (
+    extensionSDKHost: IExtensionSDKHost,
+  ) => Partial<HandshakePayload> | Promise<Partial<HandshakePayload>>;
   /**
    * Resolves a fresh auth token when the child sends `REQUEST_TOKEN_REFRESH`.
    */
@@ -38,6 +57,11 @@ export interface ExtensionSDKHostOptions {
   onUpdatePageSettings?: (
     settings: PageSettings,
   ) => boolean | Promise<boolean>;
+  /**
+   * Called when the child reports a route change via `NAVIGATION_CHANGE`
+   * (spontaneous or as ACK to {@link IExtensionSDKHost.requestNavigationChange}).
+   */
+  onNavigationChange?: (payload: NavigationChangePayload) => void;
 }
 
 /**
@@ -59,11 +83,34 @@ export interface IExtensionSDKHost {
   destroy(): void;
 
   /**
+   * Routing type from the last `HANDSHAKE_INIT`. Defaults to `server` until
+   * the child connects (and for omit / unrecognized values).
+   */
+  getRoutingType(): RoutingType;
+
+  /**
    * Asks the child to open page settings UI with the given values.
    *
    * Wire: `LOAD_PAGE_SETTINGS` (fire-and-forget).
    */
   emitLoadPageSettings(settings: PageSettings | null): void;
+
+  /**
+   * Asks the child SPA to navigate to `payload.path` without reloading the
+   * iframe. Resolves when the child ACKs with a matching `NAVIGATION_CHANGE`.
+   *
+   * Soft navigation is intended for `client-hash` extensions; the host decides
+   * whether to call this or fall back to an iframe `src` reload.
+   *
+   * @param payload - Target path within the extension.
+   * @param options - Optional request timeout (default 10s).
+   * @throws When destroyed, a request is already in progress, the payload is
+   *   invalid, or the request times out.
+   */
+  requestNavigationChange(
+    payload: RequestNavigationChangePayload,
+    options?: RequestOptions,
+  ): Promise<NavigationChangePayload>;
 }
 
 /** Default {@link IExtensionSDKHost} implementation. */
@@ -72,6 +119,11 @@ export class ExtensionSDKHost implements IExtensionSDKHost {
   #unsubscribe: (() => void) | null = null;
   #started = false;
   #destroyed = false;
+  #routingType: RoutingType = DEFAULT_ROUTING_TYPE;
+  #pendingNavigationChange: PendingRequest<
+    NavigationChangePayload,
+    string
+  > | null = null;
 
   constructor(options: ExtensionSDKHostOptions) {
     this.#options = options;
@@ -96,11 +148,52 @@ export class ExtensionSDKHost implements IExtensionSDKHost {
     this.#started = false;
     this.#unsubscribe?.();
     this.#unsubscribe = null;
+    this.#routingType = DEFAULT_ROUTING_TYPE;
+    this.#pendingNavigationChange?.reject(
+      new Error("ExtensionSDKHost has been destroyed."),
+    );
+    this.#pendingNavigationChange = null;
+  }
+
+  getRoutingType(): RoutingType {
+    return this.#routingType;
   }
 
   emitLoadPageSettings(settings: PageSettings | null): void {
     this.#assertNotDestroyed();
     this.#post(CONNECTION_EVENTS.loadPageSettings, settings);
+  }
+
+  async requestNavigationChange(
+    payload: RequestNavigationChangePayload,
+    options: RequestOptions = {},
+  ): Promise<NavigationChangePayload> {
+    this.#assertNotDestroyed();
+
+    if (!payload || typeof payload.path !== "string") {
+      throw new Error("Invalid REQUEST_NAVIGATION_CHANGE payload.");
+    }
+
+    if (this.#pendingNavigationChange) {
+      throw new Error("Navigation change request already in progress.");
+    }
+
+    const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+
+    const pending = PendingRequest.create<NavigationChangePayload, string>({
+      timeoutMs,
+      timeoutMessage: `Navigation change timed out after ${timeoutMs}ms.`,
+      context: navigationKey(payload.path, payload.search),
+      onSettle: () => {
+        if (this.#pendingNavigationChange === pending) {
+          this.#pendingNavigationChange = null;
+        }
+      },
+    });
+    this.#pendingNavigationChange = pending;
+
+    this.#post(CONNECTION_EVENTS.requestNavigationChange, payload);
+    return pending.promise;
   }
 
   async #onMessage(event: MessageEvent<ExtensionMessage>): Promise<void> {
@@ -112,7 +205,9 @@ export class ExtensionSDKHost implements IExtensionSDKHost {
 
     switch (type) {
       case CONNECTION_EVENTS.handshakeInit: {
-        await this.#handleHandshakeInit();
+        await this.#handleHandshakeInit(
+          payload as HandshakeInitPayload | undefined,
+        );
         break;
       }
       case CONNECTION_EVENTS.requestAuthTokenRefresh: {
@@ -125,15 +220,26 @@ export class ExtensionSDKHost implements IExtensionSDKHost {
         );
         break;
       }
+      case CONNECTION_EVENTS.navigationChange: {
+        this.#handleNavigationChange(
+          payload as NavigationChangePayload | undefined,
+        );
+        break;
+      }
       default: {
         break;
       }
     }
   }
 
-  async #handleHandshakeInit(): Promise<void> {
+  async #handleHandshakeInit(
+    payload: HandshakeInitPayload | undefined,
+  ): Promise<void> {
+    this.#routingType = normalizeRoutingType(payload?.routingType);
+
     try {
-      const handshakePayload = await this.#options.resolveHandshakePayload();
+      const handshakePayload =
+        await this.#options.resolveHandshakePayload(this);
       if (this.#destroyed) {
         return;
       }
@@ -184,12 +290,29 @@ export class ExtensionSDKHost implements IExtensionSDKHost {
     }
   }
 
+  #handleNavigationChange(payload: NavigationChangePayload | undefined): void {
+    if (!payload || typeof payload.path !== "string") {
+      return;
+    }
+
+    const key = navigationKey(payload.path, payload.search);
+
+    if (this.#pendingNavigationChange?.matches((context) => context === key)) {
+      this.#pendingNavigationChange.resolve(payload);
+    }
+
+    this.#options.onNavigationChange?.(payload);
+  }
+
   #postPageSettingsUpdated(success: boolean): void {
     const payload: PageSettingsUpdatedPayload = { success };
     this.#post(CONNECTION_EVENTS.pageSettingsUpdated, payload);
   }
 
-  #post(type: (typeof CONNECTION_EVENTS)[keyof typeof CONNECTION_EVENTS], payload?: unknown): void {
+  #post(
+    type: (typeof CONNECTION_EVENTS)[keyof typeof CONNECTION_EVENTS],
+    payload?: unknown,
+  ): void {
     const contentWindow = this.#options.getContentWindow();
     if (!contentWindow) {
       return;
