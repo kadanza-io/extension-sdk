@@ -56,6 +56,7 @@ const sdk: IExtensionSDK = createExtensionSDK();
 
 // Handshake flow
 const { authToken, extensionDetails, designTokens } = await sdk.connect();
+// Fields are null when that host surface omitted them.
 ```
 
 Create and use the SDK once per app. Later `createExtensionSDK()` calls return the same instance.

@@ -159,7 +159,12 @@ Wrap order: `HashRouter` → `KadanzaExtensionSDKProvider` → ready gate → ro
 
 ## Handshake data
 
-After the gate, `handshake` is available. Read it from the hook:
+After the gate, `handshake` is available. Context objects are `null` when
+that host surface omitted them (Admin Console has no `spaceId` / `pageId`).
+The host should still send [`designTokens`](flows.md#design-tokens) whenever
+a tenant is in context.
+
+Read it from the hook:
 
 ```tsx
 function Home() {
@@ -169,11 +174,16 @@ function Home() {
     return null;
   }
 
-  const { extensionDetails } = handshake;
+  const { extensionDetails, designTokens } = handshake;
 
   return (
-    <p>
-      Tenant {extensionDetails.tenantDomain} · locale {extensionDetails.locale}
+    <p
+      style={{
+        color: designTokens?.primaryColor,
+        fontFamily: designTokens?.fontFamily,
+      }}
+    >
+      Tenant {extensionDetails?.tenantDomain} · locale {extensionDetails?.locale}
     </p>
   );
 }
