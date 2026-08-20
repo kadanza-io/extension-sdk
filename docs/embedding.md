@@ -27,6 +27,8 @@ The host sends and accepts `postMessage` only against the extension URL’s orig
 
 The Kadanza parent app should use the host API from this package — do not reimplement the wire protocol.
 
+`HANDSHAKE_ACK` context is optional. Send `designTokens` whenever a tenant is in context. Include `spaceId` / `pageId` only on Experience Pages. The child SDK still connects if a field is omitted.
+
 ```ts
 import {
   ExtensionSDKHost,
@@ -46,9 +48,10 @@ const extensionSDKHost = new ExtensionSDKHost({
   origin: new URL(extensionUrl).origin,
   resolveHandshakePayload: async (
     extensionSDKHost,
-  ): Promise<HandshakePayload> => {
+  ): Promise<Partial<HandshakePayload>> => {
     const routingType = extensionSDKHost.getRoutingType();
     // Mint / load auth token + context; return HandshakePayload
+    // (designTokens when a tenant is in context; spaceId/pageId on FO only)
   },
   resolveAuthToken: async () => {
     // Mint a fresh auth token for TOKEN_REFRESH

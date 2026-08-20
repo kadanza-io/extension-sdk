@@ -7,24 +7,47 @@ export interface AuthToken {
   expires: string;
 }
 
-/** Context about the embedded extension and its host page from handshake. */
+/**
+ * Host context from handshake. Only set when the parent includes it.
+ *
+ * Field availability depends on where the iframe is mounted:
+ * - Experience Pages typically send `spaceId` and `pageId`.
+ * - Admin Console Pages typically omit those — there is no space page.
+ *
+ * Other identity fields are sent when the host knows them. Handshake does not
+ * require this object.
+ */
 export interface ExtensionDetails {
-  extensionId: string;
-  tenantId: string;
-  tenantDomain: string;
-  /** Base URL of the parent application. */
-  baseUrl: string;
-  spaceId: string;
-  pageId: string;
+  extensionId?: string;
+  tenantId?: string;
+  tenantDomain?: string;
+  /** Base URL of the parent application (used to derive the Platform API origin). */
+  baseUrl?: string;
+  /** Space that owns the Experience Page. Omitted in Admin Console. */
+  spaceId?: string;
+  /** Experience Page id. Omitted in Admin Console. */
+  pageId?: string;
   /** BCP 47 locale from the parent. */
-  locale: string;
+  locale?: string;
 }
 
-/** Branding tokens from the parent for aligning extension UI. */
+/**
+ * Tenant branding from the parent, for aligning extension UI with the host.
+ *
+ * The host should send this whenever a tenant is in context (Experience Pages
+ * and Admin Console). Handshake still succeeds if it is omitted — treat every
+ * field as optional.
+ *
+ * - `primaryColor` — tenant palette primary; accents, buttons, links
+ * - `fontFamily` — tenant font family; body and UI type
+ * - `borderRadius` — tenant roundness; controls and cards
+ *
+ * Values may be missing when the tenant has no setting configured.
+ */
 export interface DesignTokens {
-  primaryColor: string;
-  fontFamily: string;
-  borderRadius: string;
+  primaryColor?: string;
+  fontFamily?: string;
+  borderRadius?: string;
 }
 
 /** Opaque page-level settings bag owned by the extension and synced with the parent. */
@@ -59,11 +82,17 @@ export interface HandshakeInitPayload {
   routingType?: RoutingType;
 }
 
-/** Payload delivered with a successful `HANDSHAKE_ACK`. */
+/**
+ * Context delivered with `HANDSHAKE_ACK`.
+ *
+ * Handshake completes as soon as the parent ACKs. Every property is optional
+ * and only populated when that host surface provides it. After `connect()`,
+ * omitted wire fields are normalized to `null`.
+ */
 export interface HandshakePayload {
-  authToken: AuthToken;
-  extensionDetails: ExtensionDetails;
-  designTokens: DesignTokens;
+  authToken: AuthToken | null;
+  extensionDetails: ExtensionDetails | null;
+  designTokens: DesignTokens | null;
   pageSettings: PageSettings | null;
 }
 
