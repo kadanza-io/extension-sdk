@@ -2,6 +2,7 @@ import { callApi, deriveApiUrl } from "./api";
 import { CONNECTION_EVENTS } from "./events";
 import { postToParent, subscribeToParentMessages } from "./messaging";
 import { readTenantUrlFromLocation, resolveAllowedOrigin } from "./origin";
+import { PendingRequest } from "./PendingRequest";
 import type {
   AuthToken,
   AuthTokenRefreshPayload,
@@ -9,13 +10,16 @@ import type {
   DesignTokens,
   ExtensionDetails,
   ExtensionMessage,
+  HandshakeInitPayload,
   HandshakePayload,
   NavigationChangePayload,
   PageSettings,
   PageSettingsUpdatedPayload,
+  RequestNavigationChangePayload,
   RequestOptions,
   UpdatePageSettingsPayload,
 } from "./types";
+import { normalizeRoutingType } from "./types";
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -47,13 +51,16 @@ export interface IExtensionSDK {
    * Opt-in proactive refresh can be enabled with
    * `authTokenAutoRefresh: true` (optional `authTokenBufferMs`).
    *
+   * Pass `routingType: "client-hash"` for HashRouter SPAs so the parent can
+   * soft-navigate without reloading the iframe. Default is `"server"`.
+   *
    * Handshake completes when the parent sends `HANDSHAKE_ACK`. Context fields
    * (`authToken`, `extensionDetails`, `designTokens`, `pageSettings`) are
    * optional — omitted values are `null`. Use them only when the current host
    * surface provides them (e.g. `spaceId` / `pageId` on Experience Pages,
    * `designTokens` when a tenant is in context).
    *
-   * @param options - Handshake timeout and optional auth-token auto-refresh.
+   * @param options - Handshake timeout, routing type, and optional auth-token auto-refresh.
    * @throws {InvalidOriginError} When `tenantUrl` is missing or invalid.
    * @throws When not embedded in a parent frame, destroyed, or the handshake
    *   times out.
@@ -160,6 +167,17 @@ export interface IExtensionSDK {
   onLoadPageSettings(handler: (settings: PageSettings) => void): () => void;
 
   /**
+   * Registers a handler for parent-initiated `REQUEST_NAVIGATION_CHANGE`.
+   * Navigate the SPA to `payload.path` and acknowledge with
+   * {@link emitNavigationChange}.
+   *
+   * @returns Unsubscribe function.
+   */
+  onNavigate(
+    handler: (payload: RequestNavigationChangePayload) => void,
+  ): () => void;
+
+  /**
    * Registers a handler for auth-token updates (requested or parent-pushed).
    *
    * @returns Unsubscribe function.
@@ -169,19 +187,14 @@ export interface IExtensionSDK {
   /**
    * Notifies the parent that the extension's route changed.
    *
-   * Wire: `NAVIGATION_CHANGE` (fire-and-forget).
+   * Wire: `NAVIGATION_CHANGE` (fire-and-forget). Also used as the ACK after
+   * handling {@link onNavigate}.
    *
    * @param payload - Navigation change payload (`path` within the extension).
    * @throws When not connected or destroyed.
    */
   emitNavigationChange(payload: NavigationChangePayload): void;
 }
-
-type Pending<T> = {
-  resolve: (value: T) => void;
-  reject: (reason?: unknown) => void;
-  timer: ReturnType<typeof setTimeout>;
-};
 
 /** Default {@link IExtensionSDK} implementation. Prefer {@link createExtensionSDK}. */
 export class ExtensionSDK implements IExtensionSDK {
@@ -201,12 +214,16 @@ export class ExtensionSDK implements IExtensionSDK {
   #authTokenRefreshTimer: ReturnType<typeof setTimeout> | null = null;
   #authTokenRefreshRetryUsed = false;
 
-  #pendingHandshake: Pending<HandshakePayload> | null = null;
+  #pendingHandshake: PendingRequest<HandshakePayload> | null = null;
   #handshakePromise: Promise<HandshakePayload> | null = null;
-  #pendingAuthTokenRefresh: Pending<AuthToken> | null = null;
-  #pendingPageSettingsUpdate: Pending<PageSettingsUpdatedPayload> | null = null;
+  #pendingAuthTokenRefresh: PendingRequest<AuthToken> | null = null;
+  #pendingPageSettingsUpdate: PendingRequest<PageSettingsUpdatedPayload> | null =
+    null;
 
   #loadPageSettingsHandlers = new Set<(settings: PageSettings) => void>();
+  #navigateHandlers = new Set<
+    (payload: RequestNavigationChangePayload) => void
+  >();
   #authTokenRefreshHandlers = new Set<(authToken: AuthToken) => void>();
 
   get isConnected(): boolean {
@@ -240,23 +257,31 @@ export class ExtensionSDK implements IExtensionSDK {
 
     const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
 
-    const handshakePromise = new Promise<HandshakePayload>((resolve, reject) => {
-      const timer = setTimeout(() => {
-        this.#pendingHandshake = null;
+    const pending = PendingRequest.create<HandshakePayload>({
+      timeoutMs,
+      timeoutMessage: `Handshake timed out after ${timeoutMs}ms.`,
+      onSettle: () => {
+        if (this.#pendingHandshake === pending) {
+          this.#pendingHandshake = null;
+        }
         this.#handshakePromise = null;
-        reject(new Error(`Handshake timed out after ${timeoutMs}ms.`));
-      }, timeoutMs);
-
-      this.#pendingHandshake = { resolve, reject, timer };
+      },
     });
-    this.#handshakePromise = handshakePromise;
+    this.#pendingHandshake = pending;
+    this.#handshakePromise = pending.promise;
+
+    const initPayload: HandshakeInitPayload = {
+      routingType: normalizeRoutingType(options.routingType),
+    };
 
     try {
-      postToParent(CONNECTION_EVENTS.handshakeInit, this.#allowedOrigin);
+      postToParent(
+        CONNECTION_EVENTS.handshakeInit,
+        this.#allowedOrigin,
+        initPayload,
+      );
     } catch (error) {
-      this.#clearPending(this.#pendingHandshake);
-      this.#pendingHandshake = null;
-      this.#handshakePromise = null;
+      pending.abandon();
       this.#unsubscribe?.();
       this.#unsubscribe = null;
       this.#allowedOrigin = null;
@@ -265,7 +290,7 @@ export class ExtensionSDK implements IExtensionSDK {
       throw error;
     }
 
-    return handshakePromise;
+    return pending.promise;
   }
 
   destroy(): void {
@@ -281,15 +306,16 @@ export class ExtensionSDK implements IExtensionSDK {
     this.#allowedOrigin = null;
     this.#tenantUrl = null;
 
-    this.#rejectPending(this.#pendingHandshake, new Error("SDK destroyed."));
-    this.#rejectPending(this.#pendingAuthTokenRefresh, new Error("SDK destroyed."));
-    this.#rejectPending(this.#pendingPageSettingsUpdate, new Error("SDK destroyed."));
+    this.#pendingHandshake?.reject(new Error("SDK destroyed."));
+    this.#pendingAuthTokenRefresh?.reject(new Error("SDK destroyed."));
+    this.#pendingPageSettingsUpdate?.reject(new Error("SDK destroyed."));
     this.#pendingHandshake = null;
     this.#handshakePromise = null;
     this.#pendingAuthTokenRefresh = null;
     this.#pendingPageSettingsUpdate = null;
 
     this.#loadPageSettingsHandlers.clear();
+    this.#navigateHandlers.clear();
     this.#authTokenRefreshHandlers.clear();
 
     this.#authToken = null;
@@ -374,17 +400,19 @@ export class ExtensionSDK implements IExtensionSDK {
     const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
     const allowedOrigin = this.#allowedOrigin!;
 
-    const promise = new Promise<AuthToken>((resolve, reject) => {
-      const timer = setTimeout(() => {
-        this.#pendingAuthTokenRefresh = null;
-        reject(new Error(`Auth token refresh timed out after ${timeoutMs}ms.`));
-      }, timeoutMs);
-
-      this.#pendingAuthTokenRefresh = { resolve, reject, timer };
+    const pending = PendingRequest.create<AuthToken>({
+      timeoutMs,
+      timeoutMessage: `Auth token refresh timed out after ${timeoutMs}ms.`,
+      onSettle: () => {
+        if (this.#pendingAuthTokenRefresh === pending) {
+          this.#pendingAuthTokenRefresh = null;
+        }
+      },
     });
+    this.#pendingAuthTokenRefresh = pending;
 
     postToParent(CONNECTION_EVENTS.requestAuthTokenRefresh, allowedOrigin);
-    return promise;
+    return pending.promise;
   }
 
   async emitUpdatePageSettings(
@@ -400,23 +428,34 @@ export class ExtensionSDK implements IExtensionSDK {
     const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
     const allowedOrigin = this.#allowedOrigin!;
 
-    const promise = new Promise<PageSettingsUpdatedPayload>((resolve, reject) => {
-      const timer = setTimeout(() => {
-        this.#pendingPageSettingsUpdate = null;
-        reject(new Error(`Page settings update timed out after ${timeoutMs}ms.`));
-      }, timeoutMs);
-
-      this.#pendingPageSettingsUpdate = { resolve, reject, timer };
+    const pending = PendingRequest.create<PageSettingsUpdatedPayload>({
+      timeoutMs,
+      timeoutMessage: `Page settings update timed out after ${timeoutMs}ms.`,
+      onSettle: () => {
+        if (this.#pendingPageSettingsUpdate === pending) {
+          this.#pendingPageSettingsUpdate = null;
+        }
+      },
     });
+    this.#pendingPageSettingsUpdate = pending;
 
     postToParent(CONNECTION_EVENTS.updatePageSettings, allowedOrigin, payload);
-    return promise;
+    return pending.promise;
   }
 
   onLoadPageSettings(handler: (settings: PageSettings) => void): () => void {
     this.#loadPageSettingsHandlers.add(handler);
     return () => {
       this.#loadPageSettingsHandlers.delete(handler);
+    };
+  }
+
+  onNavigate(
+    handler: (payload: RequestNavigationChangePayload) => void,
+  ): () => void {
+    this.#navigateHandlers.add(handler);
+    return () => {
+      this.#navigateHandlers.delete(handler);
     };
   }
 
@@ -450,6 +489,12 @@ export class ExtensionSDK implements IExtensionSDK {
       }
       case CONNECTION_EVENTS.loadPageSettings: {
         this.#handleLoadPageSettings(payload as PageSettings | undefined);
+        break;
+      }
+      case CONNECTION_EVENTS.requestNavigationChange: {
+        this.#handleRequestNavigationChange(
+          payload as RequestNavigationChangePayload | undefined,
+        );
         break;
       }
       case CONNECTION_EVENTS.pageSettingsUpdated: {
@@ -488,10 +533,7 @@ export class ExtensionSDK implements IExtensionSDK {
       : null;
     this.#connected = true;
 
-    const pending = this.#pendingHandshake;
-    this.#pendingHandshake = null;
-    this.#handshakePromise = null;
-    this.#resolvePending(pending, this.#toHandshakePayload());
+    this.#pendingHandshake?.resolve(this.#toHandshakePayload());
 
     this.#authTokenRefreshRetryUsed = false;
     this.#scheduleProactiveAuthTokenRefresh();
@@ -499,19 +541,15 @@ export class ExtensionSDK implements IExtensionSDK {
 
   #handleAuthTokenRefresh(payload: AuthTokenRefreshPayload | undefined): void {
     if (!payload?.authToken) {
-      this.#rejectPending(
-        this.#pendingAuthTokenRefresh,
+      this.#pendingAuthTokenRefresh?.reject(
         new Error("Invalid TOKEN_REFRESH payload."),
       );
-      this.#pendingAuthTokenRefresh = null;
       return;
     }
 
     this.#authToken = payload.authToken;
 
-    const pending = this.#pendingAuthTokenRefresh;
-    this.#pendingAuthTokenRefresh = null;
-    this.#resolvePending(pending, this.#authToken);
+    this.#pendingAuthTokenRefresh?.resolve(this.#authToken);
 
     for (const handler of this.#authTokenRefreshHandlers) {
       handler(this.#authToken);
@@ -530,21 +568,29 @@ export class ExtensionSDK implements IExtensionSDK {
     }
   }
 
+  #handleRequestNavigationChange(
+    payload: RequestNavigationChangePayload | undefined,
+  ): void {
+    if (!payload || typeof payload.path !== "string") {
+      return;
+    }
+
+    for (const handler of this.#navigateHandlers) {
+      handler(payload);
+    }
+  }
+
   #handlePageSettingsUpdated(
     payload: PageSettingsUpdatedPayload | undefined,
   ): void {
     if (!payload || typeof payload.success !== "boolean") {
-      this.#rejectPending(
-        this.#pendingPageSettingsUpdate,
+      this.#pendingPageSettingsUpdate?.reject(
         new Error("Invalid PAGE_SETTINGS_UPDATED payload."),
       );
-      this.#pendingPageSettingsUpdate = null;
       return;
     }
 
-    const pending = this.#pendingPageSettingsUpdate;
-    this.#pendingPageSettingsUpdate = null;
-    this.#resolvePending(pending, payload);
+    this.#pendingPageSettingsUpdate?.resolve(payload);
   }
 
   #assertNotDestroyed(): void {
@@ -691,30 +737,5 @@ export class ExtensionSDK implements IExtensionSDK {
       this.#authTokenRefreshTimer = null;
       void this.#runProactiveAuthTokenRefresh();
     }, retryDelay);
-  }
-
-  #clearPending(pending: { timer: ReturnType<typeof setTimeout> } | null): void {
-    if (pending) {
-      clearTimeout(pending.timer);
-    }
-  }
-
-  #resolvePending<T>(pending: Pending<T> | null, value: T): void {
-    if (!pending) {
-      return;
-    }
-    clearTimeout(pending.timer);
-    pending.resolve(value);
-  }
-
-  #rejectPending(
-    pending: { timer: ReturnType<typeof setTimeout>; reject: (reason?: unknown) => void } | null,
-    reason: unknown,
-  ): void {
-    if (!pending) {
-      return;
-    }
-    clearTimeout(pending.timer);
-    pending.reject(reason);
   }
 }

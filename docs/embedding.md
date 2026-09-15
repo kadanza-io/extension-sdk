@@ -46,7 +46,10 @@ const src = enrichExtensionUrl(extensionUrl)?.toString();
 const extensionSDKHost = new ExtensionSDKHost({
   getContentWindow: () => iframe.contentWindow,
   origin: new URL(extensionUrl).origin,
-  resolveHandshakePayload: async (): Promise<Partial<HandshakePayload>> => {
+  resolveHandshakePayload: async (
+    extensionSDKHost,
+  ): Promise<Partial<HandshakePayload>> => {
+    const routingType = extensionSDKHost.getRoutingType();
     // Mint / load auth token + context; return HandshakePayload
     // (designTokens when a tenant is in context; spaceId/pageId on FO only)
   },
@@ -57,9 +60,14 @@ const extensionSDKHost = new ExtensionSDKHost({
     // Persist settings; return true on success
     return true;
   },
+  onNavigationChange: ({ path }) => {
+    // Child reported a route change — sync host URL / sidebar
+  },
 });
 
 extensionSDKHost.start();
+// Soft nav (when routingType is client-hash):
+//   await extensionSDKHost.requestNavigationChange({ path: "/settings" });
 // Later: extensionSDKHost.emitLoadPageSettings(settings);
 // On teardown: extensionSDKHost.destroy();
 ```

@@ -54,6 +54,35 @@ export interface DesignTokens {
 export type PageSettings = Record<string, unknown>;
 
 /**
+ * How the extension handles in-app routing.
+ *
+ * - `server` — full document loads (iframe `src` reload). Default.
+ * - `client-hash` — hash router SPA; supports soft navigation via
+ *   `REQUEST_NAVIGATION_CHANGE` / `NAVIGATION_CHANGE`.
+ */
+export type RoutingType = "server" | "client-hash";
+
+/** Default when `routingType` is omitted or unrecognized. */
+export const DEFAULT_ROUTING_TYPE: RoutingType = "server";
+
+/** Normalize a wire / option value to a known {@link RoutingType}. */
+export function normalizeRoutingType(value: unknown): RoutingType {
+  if (value === "client-hash") {
+    return "client-hash";
+  }
+  return DEFAULT_ROUTING_TYPE;
+}
+
+/** Payload for `HANDSHAKE_INIT` (child → parent). */
+export interface HandshakeInitPayload {
+  /**
+   * Declares how the extension routes. Omit or unknown → `server`.
+   * Soft navigation requires `client-hash`.
+   */
+  routingType?: RoutingType;
+}
+
+/**
  * Context delivered with `HANDSHAKE_ACK`.
  *
  * Handshake completes as soon as the parent ACKs. Every property is optional
@@ -82,9 +111,45 @@ export interface UpdatePageSettingsPayload {
   settings: PageSettings;
 }
 
+/** Payload for `REQUEST_NAVIGATION_CHANGE` (parent → child). */
+export interface RequestNavigationChangePayload {
+  /** Path within the extension (e.g. `/settings`). */
+  path: string;
+  /**
+   * Query string for the target route, including the leading `?`
+   * (e.g. `?tab=history`). Omitted or empty means no query.
+   *
+   * For `client-hash` extensions the query belongs inside the hash fragment;
+   * the child SDK consumer is responsible for applying it to its router.
+   */
+  search?: string;
+}
+
 /** Payload for `NAVIGATION_CHANGE` (child → parent). */
 export interface NavigationChangePayload {
+  /** Path within the extension (e.g. `/settings`). */
   path: string;
+  /**
+   * Query string of the child's current route, including the leading `?`
+   * (e.g. `?tab=history`). Omitted or empty means no query.
+   *
+   * For `client-hash` extensions the child reads this from its hash fragment,
+   * not from `window.location.search`.
+   */
+  search?: string;
+}
+
+/**
+ * Normalizes a route query string for the navigation contract.
+ *
+ * Returns `""` for missing / empty input, otherwise guarantees a single
+ * leading `?` (e.g. `tab=1` → `?tab=1`, `?tab=1` → `?tab=1`).
+ */
+export function normalizeNavigationSearch(value: unknown): string {
+  if (typeof value !== "string" || value === "" || value === "?") {
+    return "";
+  }
+  return value.startsWith("?") ? value : `?${value}`;
 }
 
 /** Envelope for parent/child `postMessage` traffic. */
@@ -97,6 +162,11 @@ export interface ExtensionMessage<TPayload = unknown> {
 export interface ConnectOptions {
   /** Handshake timeout in milliseconds (default 10_000). */
   timeoutMs?: number;
+  /**
+   * Routing mode announced to the parent on `HANDSHAKE_INIT`.
+   * HashRouter SPAs should pass `client-hash`. Default: `server`.
+   */
+  routingType?: RoutingType;
   /**
    * Enables proactive auth-token refresh. After the handshake, the SDK reads
    * the auth token's Unix-seconds `expires` value and arms a one-shot timer

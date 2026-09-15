@@ -25,13 +25,17 @@ export type {
   DesignTokens,
   ExtensionDetails,
   ExtensionMessage,
+  HandshakeInitPayload,
   HandshakePayload,
   NavigationChangePayload,
   PageSettings,
   PageSettingsUpdatedPayload,
+  RequestNavigationChangePayload,
   RequestOptions,
+  RoutingType,
   UpdatePageSettingsPayload,
 } from "./types";
+export { DEFAULT_ROUTING_TYPE, normalizeRoutingType } from "./types";
 
 let instance: IExtensionSDK | null = null;
 let hasWarnedDuplicateCreate = false;
