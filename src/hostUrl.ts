@@ -1,8 +1,7 @@
 /**
  * Returns whether `urlRaw` is a valid HTTPS extension URL.
  *
- * When `checkOrigin` is provided, the URL's origin must also pass that predicate
- * (e.g. hostname ends with `.kadanza.app`).
+ * When `checkOrigin` is provided, the URL's origin must also pass that predicate.
  */
 export function isValidExtensionUrl(
   urlRaw: string | null | undefined,
