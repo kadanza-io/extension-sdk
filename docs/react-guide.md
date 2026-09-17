@@ -1,6 +1,6 @@
 # Building a React extension
 
-Minimal pattern for wiring `@kadanza/extension-sdk` into a React app. Protocol details live in [Flows](flows.md).
+Minimal pattern for wiring `@kadanza/extension-sdk` into a React app. Protocol details live in [Flows](flows.md). Public getting started: [docs.kadanza.com](https://docs.kadanza.com/developer/getting-started/).
 
 ## Setup
 
